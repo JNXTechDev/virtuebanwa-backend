@@ -117,29 +117,54 @@ app.post('/api/login', async (req, res) => {
     console.log(`Login attempt for username: ${Username}`); // Debug log
 
     try {
-        const user = await User.findOne({ Username, Password });
+        // Find the user by username
+        const user = await User.findOne({ Username });
+
         if (!user) {
             console.log(`Login failed for username: ${Username}`); // Debug log
             return res.status(401).send({ message: 'Invalid username or password' });
         }
-        console.log(`Login successful for username: ${Username}`); // Debug log
-        res.send({
-            message: 'Login successful',
-            user: {
-                Username: user.Username,
-                Role: user.Role,
-                Section: user.Section,
-                FirstName: user.FirstName, // Include FirstName
-                LastName: user.LastName,   // Include LastName
-                Character: user.Character  // Include Character
+
+        // Check if the user is a student
+        if (user.Role === 'Student') {
+            // For students, no password is required
+            console.log(`Login successful for student: ${Username}`); // Debug log
+            return res.send({
+                message: 'Login successful',
+                user: {
+                    Username: user.Username,
+                    Role: user.Role,
+                    Section: user.Section,
+                    FirstName: user.FirstName, // Include FirstName
+                    LastName: user.LastName,   // Include LastName
+                    Character: user.Character  // Include Character
+                }
+            });
+        } else {
+            // For teachers and admins, check the password
+            if (user.Password !== Password) {
+                console.log(`Login failed for username: ${Username}`); // Debug log
+                return res.status(401).send({ message: 'Invalid username or password' });
             }
-        });
+
+            console.log(`Login successful for username: ${Username}`); // Debug log
+            res.send({
+                message: 'Login successful',
+                user: {
+                    Username: user.Username,
+                    Role: user.Role,
+                    Section: user.Section,
+                    FirstName: user.FirstName, // Include FirstName
+                    LastName: user.LastName,   // Include LastName
+                    Character: user.Character  // Include Character
+                }
+            });
+        }
     } catch (err) {
         console.error(`Error during login: ${err.message}`); // Debug log
         res.status(500).send({ error: err.message });
     }
 });
-
 // Classroom schema
 const classroomSchema = new mongoose.Schema({
     name: { type: String, required: true },
