@@ -205,16 +205,16 @@ app.get('/api/classrooms', async (req, res) => {
     }
 });
 
-// ✅ DELETE user by first name and last name
+// ✅ DELETE user by full name
 app.delete('/api/users/remove', async (req, res) => {
-    const { firstname, lastname } = req.query; // Get first name and last name from query parameters
+    const { fullname } = req.query; // Get full name from query parameters
 
-    if (!firstname || !lastname) {
-        return res.status(400).send({ error: 'First name and last name are required.' });
+    if (!fullname) {
+        return res.status(400).send({ error: 'Full name is required.' });
     }
 
     try {
-        const result = await User.findOneAndDelete({ FirstName: firstname, LastName: lastname });
+        const result = await User.findOneAndDelete({ FullName: fullname });
 
         if (!result) {
             return res.status(404).send({ error: 'User not found.' });
