@@ -241,6 +241,45 @@ app.delete('/api/classrooms/:code', async (req, res) => {
     }
 });
 
+
+
+// Add multer for handling file uploads
+const multer = require('multer');
+const csv = require('csv-parser');
+const fs = require('fs');
+const upload = multer({ dest: 'uploads/' });
+
+// POST route for CSV upload
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).send({ error: 'No file uploaded.' });
+    }
+
+    const results = [];
+    try {
+        fs.createReadStream(req.file.path)
+            .pipe(csv())
+            .on('data', (data) => {
+                // Add FullName field
+                data.FullName = `${data.FirstName} ${data.LastName}`;
+                results.push(data);
+            })
+            .on('end', async () => {
+                try {
+                    // Insert all users
+                    await User.insertMany(results);
+                    // Clean up uploaded file
+                    fs.unlinkSync(req.file.path);
+                    res.send({ message: 'File processed successfully', count: results.length });
+                } catch (err) {
+                    res.status(500).send({ error: err.message });
+                }
+            });
+    } catch (err) {
+        res.status(500).send({ error: err.message });
+    }
+});
+
 // ✅ Start the server
 app.listen(PORT, () => {
     console.log(`Server running on http://192.168.1.11:${PORT}`);
