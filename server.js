@@ -38,6 +38,7 @@ const userSchema = new mongoose.Schema({
     },
     FirstName: { type: String, required: true },
     LastName: { type: String, required: true },
+    FullName: { type: String, required: true }, // Add FullName field
     Character: { type: String, required: true }
 });
 
@@ -206,7 +207,7 @@ app.get('/api/classrooms', async (req, res) => {
 });
 
 // ✅ DELETE user by full name
-app.delete('/api/users/remove', async (req, res) => {
+    app.delete('/api/users/remove', async (req, res) => {
     const { fullname } = req.query; // Get full name from query parameters
 
     if (!fullname) {
@@ -226,6 +227,7 @@ app.delete('/api/users/remove', async (req, res) => {
         res.status(500).send({ error: err.message });
     }
 });
+
 
 // ✅ DELETE classroom by code
 app.delete('/api/classrooms/:code', async (req, res) => {
