@@ -267,10 +267,12 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
                         FirstName: firstName,
                         LastName: lastName,
                         FullName: `${firstName} ${lastName}`,
-                        Role: role || 'Student',
+                        Role: 'Student',
                         Section: section || '',
                         Username: username || `${firstName.toLowerCase()}${lastName.toLowerCase()}`,
-                        Character: character || 'Character1'
+                        Character: character || 'Character1',
+                        Password: '', // Add empty password for students
+                        rewards_collected: []
                     });
                 }
             }
