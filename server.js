@@ -3,6 +3,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -17,6 +19,9 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
+
+// Multer configuration for file uploads
+const upload = multer({ dest: 'uploads/' });
 
 // MongoDB connection string
 const mongoURI = process.env.MONGO_URI;
@@ -207,7 +212,7 @@ app.get('/api/classrooms', async (req, res) => {
 });
 
 // ✅ DELETE user by full name
-    app.delete('/api/users/remove', async (req, res) => {
+app.delete('/api/users/remove', async (req, res) => {
     const { fullname } = req.query; // Get full name from query parameters
 
     if (!fullname) {
@@ -228,7 +233,6 @@ app.get('/api/classrooms', async (req, res) => {
     }
 });
 
-
 // ✅ DELETE classroom by code
 app.delete('/api/classrooms/:code', async (req, res) => {
     const { code } = req.params;
@@ -241,32 +245,47 @@ app.delete('/api/classrooms/:code', async (req, res) => {
     }
 });
 
-// POST route for CSV upload
-app.post('/api/upload', async (req, res) => {
+// Update the POST route for CSV upload to handle form-data properly
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).send({ error: 'No file uploaded.' });
+    }
+
     try {
-        // Get data from request body
-        const students = req.body;
+        // Read the CSV file content
+        const fileContent = fs.readFileSync(req.file.path, 'utf8');
+        const lines = fileContent.split('\n');
         
-        if (!Array.isArray(students)) {
-            return res.status(400).send({ error: 'Invalid data format. Expected array of students.' });
+        // Skip header row and process each line
+        const students = [];
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line) {
+                const [firstName, lastName, role, section, username, character] = line.split(',').map(s => s.trim());
+                if (firstName && lastName) {
+                    students.push({
+                        FirstName: firstName,
+                        LastName: lastName,
+                        FullName: `${firstName} ${lastName}`,
+                        Role: role || 'Student',
+                        Section: section || '',
+                        Username: username || `${firstName.toLowerCase()}${lastName.toLowerCase()}`,
+                        Character: character || 'Character1'
+                    });
+                }
+            }
         }
 
-        // Process each student
-        const processedStudents = students.map(student => ({
-            ...student,
-            FullName: `${student.FirstName} ${student.LastName}`,
-            Role: 'Student',
-            rewards_collected: []
-        }));
-
         // Insert all students
-        const result = await User.insertMany(processedStudents, { ordered: false });
-        
-        res.send({ 
-            message: 'Students uploaded successfully', 
-            count: result.length 
-        });
+        if (students.length > 0) {
+            await User.insertMany(students);
+            fs.unlinkSync(req.file.path); // Clean up uploaded file
+            res.send({ message: 'File processed successfully', count: students.length });
+        } else {
+            res.status(400).send({ error: 'No valid student data found in file' });
+        }
     } catch (err) {
+        console.error('Error processing file:', err);
         res.status(500).send({ error: err.message });
     }
 });
