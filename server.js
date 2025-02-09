@@ -241,40 +241,31 @@ app.delete('/api/classrooms/:code', async (req, res) => {
     }
 });
 
-
-
-// Add multer for handling file uploads
-const multer = require('multer');
-const csv = require('csv-parser');
-const fs = require('fs');
-const upload = multer({ dest: 'uploads/' });
-
 // POST route for CSV upload
-app.post('/api/upload', upload.single('file'), async (req, res) => {
-    if (!req.file) {
-        return res.status(400).send({ error: 'No file uploaded.' });
-    }
-
-    const results = [];
+app.post('/api/upload', async (req, res) => {
     try {
-        fs.createReadStream(req.file.path)
-            .pipe(csv())
-            .on('data', (data) => {
-                // Add FullName field
-                data.FullName = `${data.FirstName} ${data.LastName}`;
-                results.push(data);
-            })
-            .on('end', async () => {
-                try {
-                    // Insert all users
-                    await User.insertMany(results);
-                    // Clean up uploaded file
-                    fs.unlinkSync(req.file.path);
-                    res.send({ message: 'File processed successfully', count: results.length });
-                } catch (err) {
-                    res.status(500).send({ error: err.message });
-                }
-            });
+        // Get data from request body
+        const students = req.body;
+        
+        if (!Array.isArray(students)) {
+            return res.status(400).send({ error: 'Invalid data format. Expected array of students.' });
+        }
+
+        // Process each student
+        const processedStudents = students.map(student => ({
+            ...student,
+            FullName: `${student.FirstName} ${student.LastName}`,
+            Role: 'Student',
+            rewards_collected: []
+        }));
+
+        // Insert all students
+        const result = await User.insertMany(processedStudents, { ordered: false });
+        
+        res.send({ 
+            message: 'Students uploaded successfully', 
+            count: result.length 
+        });
     } catch (err) {
         res.status(500).send({ error: err.message });
     }
