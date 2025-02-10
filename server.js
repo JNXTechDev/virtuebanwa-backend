@@ -33,8 +33,8 @@ mongoose.connect(mongoURI)
 // User schema
 const userSchema = new mongoose.Schema({
     Username: { type: String, required: true, unique: true },
-    Password: { type: String, required: true },
-    Role: { type: String, required: true },
+    Password: { type: String, default: 'defaultPassword' }, // Default password for students
+    Role: { type: String, required: true, default: 'Student' }, // Default role is Student
     Section: {
         type: String,
         required: function () {
@@ -246,34 +246,52 @@ app.delete('/api/classrooms/:code', async (req, res) => {
 });
 
 // Update the POST route for CSV upload to handle form-data properly
-app.post('/api/upload', upload.single('file'), async (req, res) => {
-    if (!req.file) {
-        return res.status(400).send({ error: 'No file uploaded.' });
-    }
+                app.post('/api/upload', upload.single('file'), async (req, res) => {
+                    if (!req.file) {
+                        return res.status(400).send({ error: 'No file uploaded.' });
+                    }
 
-    try {
-        // Read the CSV file content
-        const fileContent = fs.readFileSync(req.file.path, 'utf8');
-        const lines = fileContent.split('\n');
+                    try {
+                        // Read the CSV file content
+                        const fileContent = fs.readFileSync(req.file.path, 'utf8');
+                        const lines = fileContent.split('\n');
+
+                        // Skip header row and process each line
+                        const students = [];
+                        for (let i = 1; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            if (line) {
+                                const [firstName, lastName, section, username, character] = line.split(',').map(s => s.trim());
+                                if (firstName && lastName) {
+                                    students.push({
+                                        FirstName: firstName,
+                                        LastName: lastName,
+                                        FullName: `${firstName} ${lastName}`,
+                                        Role: 'Student', // Default role is Student
+                                        Section: section || '',
+                                        Username: username || `${firstName.toLowerCase()}${lastName.toLowerCase()}`,
+                                        Character: character || 'Character1',
+                                        Password: 'defaultPassword', // Set a default password for students
+                                        rewards_collected: []
+                                    });
+                                }
+                            }
+                        }
+
+                        // Insert all students
+                        if (students.length > 0) {
+                            await User.insertMany(students);
+                            fs.unlinkSync(req.file.path); // Clean up uploaded file
+                            res.send({ message: 'File processed successfully', count: students.length });
+                        } else {
+                            res.status(400).send({ error: 'No valid student data found in file' });
+                        }
+                    } catch (err) {
+                        console.error('Error processing file:', err);
+                        res.status(500).send({ error: err.message });
+                    }
+                });
         
-        // Skip header row and process each line
-        const students = [];
-        for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (line) {
-                const [firstName, lastName, role, section, username, character] = line.split(',').map(s => s.trim());
-                if (firstName && lastName) {
-                    students.push({
-                        FirstName: firstName,
-                        LastName: lastName,
-                        FullName: `${firstName} ${lastName}`,
-                        Role: 'Student',
-                        Section: section || '',
-                        Username: username || `${firstName.toLowerCase()}${lastName.toLowerCase()}`,
-                        Character: character || 'Character1',
-                        Password: '', // Add empty password for students
-                        rewards_collected: []
-                    });
                 }
             }
         }
