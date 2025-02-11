@@ -295,11 +295,12 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 // GET unique sections
 app.get('/api/sections', async (req, res) => {
     try {
-        const sections = await User.distinct('Section');
-        // Filter out empty or null sections
-        const validSections = sections.filter(section => section && section.trim());
-        res.send(validSections);
+        const users = await User.find({ Section: { $exists: true, $ne: '' } }, 'Section');
+        const uniqueSections = [...new Set(users.map(user => user.Section))].sort();
+        console.log("Found sections:", uniqueSections); // Debug log
+        res.json(uniqueSections);
     } catch (err) {
+        console.error("Error fetching sections:", err);
         res.status(500).send({ error: err.message });
     }
 });
