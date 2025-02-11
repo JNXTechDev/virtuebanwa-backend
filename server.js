@@ -92,7 +92,11 @@ app.get('/api/users/:username', async (req, res) => {
 // ✅ POST create a new user
 app.post('/api/users', async (req, res) => {
     const { Username, Password, Role, Section, FirstName, LastName, Character } = req.body;
-    console.log("Received data:", { Username, Password, Role, Section });
+
+    // Auto-generate FullName from FirstName and LastName
+    const FullName = `${FirstName} ${LastName}`;
+
+    console.log("Received data:", { Username, Password, Role, Section, FirstName, LastName, Character, FullName });
 
     if (!Username || !Password || !Role || !FirstName || !LastName || !Character) {
         return res.status(400).send({ error: 'Missing required fields.' });
@@ -108,7 +112,18 @@ app.post('/api/users', async (req, res) => {
             return res.status(400).send({ error: 'Username already exists.' });
         }
 
-        const newUser = new User({ Username, Password, Role, Section, FirstName, LastName, Character });
+        // Create new user with auto-generated FullName
+        const newUser = new User({
+            Username,
+            Password,
+            Role,
+            Section,
+            FirstName,
+            LastName,
+            Character,
+            FullName // Auto-generated FullName
+        });
+
         await newUser.save();
 
         console.log("User created:", newUser);
