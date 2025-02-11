@@ -26,7 +26,7 @@ const upload = multer({ dest: 'uploads/' });
 // MongoDB connection string
 const mongoURI = process.env.MONGO_URI;
 
-mongoose.connect(mongoURI)  
+mongoose.connect(mongoURI)
     .then(() => console.log("MongoDB connected"))
     .catch(err => console.error("MongoDB connection error:", err));
 
@@ -288,6 +288,18 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         }
     } catch (err) {
         console.error('Error processing file:', err);
+        res.status(500).send({ error: err.message });
+    }
+});
+
+// GET unique sections
+app.get('/api/sections', async (req, res) => {
+    try {
+        const sections = await User.distinct('Section');
+        // Filter out empty or null sections
+        const validSections = sections.filter(section => section && section.trim());
+        res.send(validSections);
+    } catch (err) {
         res.status(500).send({ error: err.message });
     }
 });
