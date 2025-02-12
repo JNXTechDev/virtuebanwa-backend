@@ -44,7 +44,12 @@ const userSchema = new mongoose.Schema({
     FirstName: { type: String, required: true },
     LastName: { type: String, required: true },
     FullName: { type: String, required: true }, // Add FullName field
-    Character: { type: String, required: true }
+    Character: { type: String, required: true },
+    rewards_collected: [{
+        reward: { type: String, required: true },
+        message: { type: String, required: true },
+        date: { type: Date, default: Date.now }
+    }]
 });
 
 const User = mongoose.model('User', userSchema);
@@ -303,6 +308,36 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         }
     } catch (err) {
         console.error('Error processing file:', err);
+        res.status(500).send({ error: err.message });
+    }
+});
+
+
+// ✅ POST route to add a reward to a user
+app.post('/api/users/rewards', async (req, res) => {
+    const { fullName, reward, message } = req.body;
+
+    if (!fullName || !reward || !message) {
+        return res.status(400).send({ error: 'Full name, reward, and message are required.' });
+    }
+
+    try {
+        const user = await User.findOne({ FullName: fullName });
+        if (!user) {
+            return res.status(404).send({ error: 'User not found.' });
+        }
+
+        const newReward = {
+            reward,
+            message,
+            date: new Date()
+        };
+
+        user.rewards_collected.push(newReward);
+        await user.save();
+
+        res.send({ message: 'Reward added successfully', user });
+    } catch (err) {
         res.status(500).send({ error: err.message });
     }
 });
