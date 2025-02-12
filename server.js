@@ -275,43 +275,68 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         // Read the CSV file content
         const fileContent = fs.readFileSync(req.file.path, 'utf8');
         const lines = fileContent.split('\n');
+        
+        // Track successful and duplicate entries
+        const stats = {
+            added: 0,
+            duplicates: 0,
+            total: 0
+        };
 
-        // Skip header row and process each line
-        const students = [];
+        // Process each line (skip header)
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim();
             if (line) {
                 const [firstName, lastName, section, username, character] = line.split(',').map(s => s.trim());
+                const fullName = `${firstName} ${lastName}`;
+
                 if (firstName && lastName) {
-                    students.push({
-                        FirstName: firstName,
-                        LastName: lastName,
-                        FullName: `${firstName} ${lastName}`,
-                        Role: 'Student', // Default role is Student
-                        Section: section || '',
-                        Username: username || `${firstName.toLowerCase()}${lastName.toLowerCase()}`,
-                        Character: character || 'Character1',
-                        Password: 'defaultPassword', // Set a default password for students
-                        rewards_collected: []
-                    });
+                    try {
+                        // Check if username already exists
+                        const existingUser = await User.findOne({ Username: username });
+                        
+                        if (!existingUser) {
+                            // Create new user only if username doesn't exist
+                            const newUser = new User({
+                                FirstName: firstName,
+                                LastName: lastName,
+                                FullName: fullName,
+                                Role: 'Student',
+                                Section: section || '',
+                                Username: username,
+                                Character: character || 'Character1',
+                                Password: 'defaultPassword',
+                                rewards_collected: []
+                            });
+                            
+                            await newUser.save();
+                            stats.added++;
+                        } else {
+                            stats.duplicates++;
+                        }
+                        stats.total++;
+                    } catch (err) {
+                        console.error('Error processing student:', err);
+                    }
                 }
             }
         }
 
-        // Insert all students
-        if (students.length > 0) {
-            await User.insertMany(students);
-            fs.unlinkSync(req.file.path); // Clean up uploaded file
-            res.send({ message: 'File processed successfully', count: students.length });
-        } else {
-            res.status(400).send({ error: 'No valid student data found in file' });
-        }
+        // Clean up uploaded file
+        fs.unlinkSync(req.file.path);
+
+        // Send detailed response
+        res.send({
+            message: `File processed successfully. Added ${stats.added} new students, ${stats.duplicates} duplicates skipped.`,
+            count: stats.added,
+            stats: stats
+        });
+
     } catch (err) {
         console.error('Error processing file:', err);
         res.status(500).send({ error: err.message });
     }
 });
-
 
 // ✅ POST route to add a reward to a user
 app.post('/api/users/rewards', async (req, res) => {
