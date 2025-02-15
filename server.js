@@ -188,17 +188,17 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).send({ message: 'Invalid username or password' });
         }
 
-        // Check AdminApproval for teachers with specific messages
+        // Check AdminApproval for teachers
         if (user.Role === 'Teacher') {
             if (user.AdminApproval === 'Pending') {
-                return res.status(401).send({ 
-                    message: 'pending approval',
+                return res.status(401).send({
+                    message: 'Your account is pending approval',
                     status: 'Pending'
                 });
             }
             if (user.AdminApproval === 'Rejected') {
-                return res.status(401).send({ 
-                    message: 'registration rejected',
+                return res.status(401).send({
+                    message: 'Your account registration has been rejected',
                     status: 'Rejected'
                 });
             }
