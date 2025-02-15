@@ -54,6 +54,12 @@ const userSchema = new mongoose.Schema({
         type: String, 
         enum: ['Pending', 'Approved', 'Rejected'],
         default: 'Pending'
+    },
+    CreatedBy: { 
+        type: String,
+        required: function() {
+            return this.Role === 'Student';
+        }
     }
 });
 
@@ -101,12 +107,12 @@ app.get('/api/users/:username', async (req, res) => {
 
 // ✅ POST create a new user
 app.post('/api/users', async (req, res) => {
-    const { Username, Password, Role, Section, FirstName, LastName, Character } = req.body;
+    const { Username, Password, Role, Section, FirstName, LastName, Character, CreatedBy } = req.body;
 
     // Auto-generate FullName from FirstName and LastName
     const FullName = `${FirstName} ${LastName}`;
 
-    console.log("Received data:", { Username, Password, Role, Section, FirstName, LastName, Character, FullName });
+    console.log("Received data:", { Username, Password, Role, Section, FirstName, LastName, Character, FullName, CreatedBy });
 
     if (!Username || !Password || !Role || !FirstName || !LastName || !Character) {
         return res.status(400).send({ error: 'Missing required fields.' });
@@ -131,7 +137,8 @@ app.post('/api/users', async (req, res) => {
             FirstName,
             LastName,
             Character,
-            FullName // Auto-generated FullName
+            FullName, // Auto-generated FullName
+            CreatedBy: Role === 'Student' ? CreatedBy : undefined
         });
 
         await newUser.save();
@@ -324,6 +331,8 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         return res.status(400).send({ error: 'No file uploaded.' });
     }
 
+    const teacherUsername = req.body.teacherUsername; // Get teacher username from request
+
     try {
         // Read the CSV file content
         const fileContent = fs.readFileSync(req.file.path, 'utf8');
@@ -359,7 +368,8 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
                                 Username: username,
                                 Character: character || 'Character1',
                                 Password: 'defaultPassword',
-                                rewards_collected: []
+                                rewards_collected: [],
+                                CreatedBy: teacherUsername
                             });
                             
                             await newUser.save();
