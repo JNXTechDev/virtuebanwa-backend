@@ -49,7 +49,12 @@ const userSchema = new mongoose.Schema({
         reward: { type: String, required: true },
         message: { type: String, required: true },
         date: { type: Date, default: Date.now }
-    }]
+    }],
+    AdminApproval: { 
+        type: String, 
+        enum: ['Pending', 'Approved', 'Rejected'],
+        default: 'Pending'
+    }
 });
 
 const User = mongoose.model('User', userSchema);
@@ -138,6 +143,38 @@ app.post('/api/users', async (req, res) => {
     }
 });
 
+// POST create a new teacher account
+app.post('/api/users/teacher', async (req, res) => {
+    const { FirstName, LastName, EmployeeID, Username, Password, Role, AdminApproval } = req.body;
+
+    if (!FirstName || !LastName || !EmployeeID || !Username || !Password) {
+        return res.status(400).send({ error: 'All fields are required.' });
+    }
+
+    try {
+        const existingUser = await User.findOne({ Username });
+        if (existingUser) {
+            return res.status(400).send({ error: 'Username already exists.' });
+        }
+
+        const newTeacher = new User({
+            FirstName,
+            LastName,
+            EmployeeID,
+            Username,
+            Password,
+            Role: 'Teacher',
+            AdminApproval: 'Pending',
+            FullName: `${FirstName} ${LastName}`
+        });
+
+        await newTeacher.save();
+        res.status(201).send({ message: 'Teacher registration pending approval' });
+    } catch (err) {
+        res.status(500).send({ error: err.message });
+    }
+});
+
 // ✅ POST login user
 app.post('/api/login', async (req, res) => {
     const { Username, Password } = req.body;
@@ -149,6 +186,15 @@ app.post('/api/login', async (req, res) => {
         if (!user) {
             console.log(`Login failed for username: ${Username}`);
             return res.status(401).send({ message: 'Invalid username or password' });
+        }
+
+        // Check AdminApproval for teachers
+        if (user.Role === 'Teacher') {
+            if (user.AdminApproval !== 'Approved') {
+                return res.status(401).send({ 
+                    message: 'Your account is pending approval or has been rejected' 
+                });
+            }
         }
 
         if (user.Role === 'Student') {
