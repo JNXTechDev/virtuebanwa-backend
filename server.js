@@ -68,7 +68,20 @@ const User = mongoose.model('User', userSchema);
 // ✅ GET all users (FIXED: Added this missing route)
 app.get('/api/users', async (req, res) => {
     try {
-        const users = await User.find({}, '-Password'); // Exclude passwords for security
+        const { teacherUsername } = req.query;
+        let filter = {};
+        
+        // If teacherUsername is provided, filter students created by that teacher
+        if (teacherUsername) {
+            filter = {
+                $and: [
+                    { Role: 'Student' },
+                    { CreatedBy: teacherUsername }
+                ]
+            };
+        }
+
+        const users = await User.find(filter, '-Password'); // Exclude passwords for security
         res.send(users);
     } catch (err) {
         res.status(500).send({ error: err.message });
