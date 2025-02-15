@@ -33,32 +33,37 @@ mongoose.connect(mongoURI)
 // User schema
 const userSchema = new mongoose.Schema({
     Username: { type: String, required: true, unique: true },
-    Password: { type: String, default: 'defaultPassword' }, // Default password for students
-    Role: { type: String, required: true, default: 'Student' }, // Default role is Student
+    Password: { type: String, required: function() { return this.Role === 'Admin' || this.Role === 'Teacher'; } },
+    Role: { type: String, required: true, enum: ['Admin', 'Teacher', 'Student'] },
+    // Make these fields required only for non-admin users
     Section: {
         type: String,
         required: function () {
             return this.Role === 'Student';
         }
     },
-    FirstName: { type: String, required: true },
-    LastName: { type: String, required: true },
-    FullName: { type: String, required: true }, // Add FullName field
-    Character: { type: String, required: true },
-    rewards_collected: [{
-        reward: { type: String, required: true },
-        message: { type: String, required: true },
-        date: { type: Date, default: Date.now }
-    }],
-    AdminApproval: { 
-        type: String, 
-        enum: ['Pending', 'Approved', 'Rejected'],
-        default: 'Pending'
-    },
-    CreatedBy: { 
+    FirstName: {
         type: String,
-        required: function() {
-            return this.Role === 'Student';
+        required: function () {
+            return this.Role !== 'Admin';
+        }
+    },
+    LastName: {
+        type: String,
+        required: function () {
+            return this.Role !== 'Admin';
+        }
+    },
+    FullName: {
+        type: String,
+        required: function () {
+            return this.Role !== 'Admin';
+        }
+    },
+    Character: {
+        type: String,
+        required: function () {
+            return this.Role !== 'Admin';
         }
     }
 });
@@ -68,20 +73,7 @@ const User = mongoose.model('User', userSchema);
 // ✅ GET all users (FIXED: Added this missing route)
 app.get('/api/users', async (req, res) => {
     try {
-        const { teacherUsername } = req.query;
-        let filter = {};
-        
-        // If teacherUsername is provided, filter students created by that teacher
-        if (teacherUsername) {
-            filter = {
-                $and: [
-                    { Role: 'Student' },
-                    { CreatedBy: teacherUsername }
-                ]
-            };
-        }
-
-        const users = await User.find(filter, '-Password'); // Exclude passwords for security
+        const users = await User.find({}, '-Password'); // Exclude passwords for security
         res.send(users);
     } catch (err) {
         res.status(500).send({ error: err.message });
@@ -120,12 +112,8 @@ app.get('/api/users/:username', async (req, res) => {
 
 // ✅ POST create a new user
 app.post('/api/users', async (req, res) => {
-    const { Username, Password, Role, Section, FirstName, LastName, Character, CreatedBy } = req.body;
-
-    // Auto-generate FullName from FirstName and LastName
-    const FullName = `${FirstName} ${LastName}`;
-
-    console.log("Received data:", { Username, Password, Role, Section, FirstName, LastName, Character, FullName, CreatedBy });
+    const { Username, Password, Role, Section, FirstName, LastName, Character } = req.body;
+    console.log("Received data:", { Username, Password, Role, Section });
 
     if (!Username || !Password || !Role || !FirstName || !LastName || !Character) {
         return res.status(400).send({ error: 'Missing required fields.' });
@@ -141,56 +129,11 @@ app.post('/api/users', async (req, res) => {
             return res.status(400).send({ error: 'Username already exists.' });
         }
 
-        // Create new user with auto-generated FullName
-        const newUser = new User({
-            Username,
-            Password,
-            Role,
-            Section,
-            FirstName,
-            LastName,
-            Character,
-            FullName, // Auto-generated FullName
-            CreatedBy: Role === 'Student' ? CreatedBy : undefined
-        });
-
+        const newUser = new User({ Username, Password, Role, Section, FirstName, LastName, Character });
         await newUser.save();
 
         console.log("User created:", newUser);
         res.status(201).send({ message: 'User created successfully', user: newUser });
-    } catch (err) {
-        res.status(500).send({ error: err.message });
-    }
-});
-
-// Update the teacher registration route to handle Character field
-app.post('/api/users/teacher', async (req, res) => {
-    const { FirstName, LastName, EmployeeID, Username, Password, Role, AdminApproval, Character } = req.body;
-
-    if (!FirstName || !LastName || !EmployeeID || !Username || !Password) {
-        return res.status(400).send({ error: 'All fields are required.' });
-    }
-
-    try {
-        const existingUser = await User.findOne({ Username });
-        if (existingUser) {
-            return res.status(400).send({ error: 'Username already exists.' });
-        }
-
-        const newTeacher = new User({
-            FirstName,
-            LastName,
-            EmployeeID,
-            Username,
-            Password,
-            Role: 'Teacher',
-            AdminApproval: 'Pending',
-            FullName: `${FirstName} ${LastName}`,
-            Character: Character || 'Teacher' // Use provided Character or default to 'Teacher'
-        });
-
-        await newTeacher.save();
-        res.status(201).send({ message: 'Teacher registration pending approval' });
     } catch (err) {
         res.status(500).send({ error: err.message });
     }
@@ -205,23 +148,21 @@ app.post('/api/login', async (req, res) => {
         const user = await User.findOne({ Username });
 
         if (!user) {
+            console.log(`Login failed for username: ${Username}`);
             return res.status(401).send({ message: 'Invalid username or password' });
         }
 
-        // Check AdminApproval for teachers
-        if (user.Role === 'Teacher') {
-            if (user.AdminApproval === 'Pending') {
-                return res.status(401).send({
-                    message: 'Your account is pending approval',
-                    status: 'Pending'
-                });
+        if (user.Role === 'Admin') {
+            if (user.Password !== Password) {
+                return res.status(401).send({ message: 'Invalid username or password' });
             }
-            if (user.AdminApproval === 'Rejected') {
-                return res.status(401).send({
-                    message: 'Your account registration has been rejected',
-                    status: 'Rejected'
-                });
-            }
+            return res.send({
+                message: 'Login successful',
+                user: {
+                    Username: user.Username,
+                    Role: user.Role
+                }
+            });
         }
 
         if (user.Role === 'Student') {
@@ -344,114 +285,43 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         return res.status(400).send({ error: 'No file uploaded.' });
     }
 
-    const teacherUsername = req.body.teacherUsername; // Get teacher username from request
-
     try {
         // Read the CSV file content
         const fileContent = fs.readFileSync(req.file.path, 'utf8');
         const lines = fileContent.split('\n');
-        
-        // Track successful and duplicate entries
-        const stats = {
-            added: 0,
-            duplicates: 0,
-            total: 0
-        };
 
-        // Process each line (skip header)
+        // Skip header row and process each line
+        const students = [];
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim();
             if (line) {
                 const [firstName, lastName, section, username, character] = line.split(',').map(s => s.trim());
-                const fullName = `${firstName} ${lastName}`;
-
                 if (firstName && lastName) {
-                    try {
-                        // Check if username already exists
-                        const existingUser = await User.findOne({ Username: username });
-                        
-                        if (!existingUser) {
-                            // Create new user only if username doesn't exist
-                            const newUser = new User({
-                                FirstName: firstName,
-                                LastName: lastName,
-                                FullName: fullName,
-                                Role: 'Student',
-                                Section: section || '',
-                                Username: username,
-                                Character: character || 'Character1',
-                                Password: 'defaultPassword',
-                                rewards_collected: [],
-                                CreatedBy: teacherUsername
-                            });
-                            
-                            await newUser.save();
-                            stats.added++;
-                        } else {
-                            stats.duplicates++;
-                        }
-                        stats.total++;
-                    } catch (err) {
-                        console.error('Error processing student:', err);
-                    }
+                    students.push({
+                        FirstName: firstName,
+                        LastName: lastName,
+                        FullName: `${firstName} ${lastName}`,
+                        Role: 'Student', // Default role is Student
+                        Section: section || '',
+                        Username: username || `${firstName.toLowerCase()}${lastName.toLowerCase()}`,
+                        Character: character || 'Character1',
+                        Password: 'defaultPassword', // Set a default password for students
+                        rewards_collected: []
+                    });
                 }
             }
         }
 
-        // Clean up uploaded file
-        fs.unlinkSync(req.file.path);
-
-        // Send detailed response
-        res.send({
-            message: `File processed successfully. Added ${stats.added} new students, ${stats.duplicates} duplicates skipped.`,
-            count: stats.added,
-            stats: stats
-        });
-
+        // Insert all students
+        if (students.length > 0) {
+            await User.insertMany(students);
+            fs.unlinkSync(req.file.path); // Clean up uploaded file
+            res.send({ message: 'File processed successfully', count: students.length });
+        } else {
+            res.status(400).send({ error: 'No valid student data found in file' });
+        }
     } catch (err) {
         console.error('Error processing file:', err);
-        res.status(500).send({ error: err.message });
-    }
-});
-
-// ✅ POST route to add a reward to a user
-app.post('/api/users/rewards', async (req, res) => {
-    const { fullName, reward, message } = req.body;
-
-    if (!fullName || !reward || !message) {
-        return res.status(400).send({ error: 'Full name, reward, and message are required.' });
-    }
-
-    try {
-        const user = await User.findOne({ FullName: fullName });
-        if (!user) {
-            return res.status(404).send({ error: 'User not found.' });
-        }
-
-        const newReward = {
-            reward,
-            message,
-            date: new Date()
-        };
-
-        user.rewards_collected.push(newReward);
-        await user.save();
-
-        res.send({ message: 'Reward added successfully', user });
-    } catch (err) {
-        res.status(500).send({ error: err.message });
-    }
-});
-
-// GET unique sections
-app.get('/api/sections', async (req, res) => {
-    try {
-        const users = await User.find({ Section: { $exists: true, $ne: '' } }, 'Section');
-        const uniqueSections = [...new Set(users.map(user => user.Section))].sort();
-        console.log("Found sections:", uniqueSections); // Debug log
-        res.json(uniqueSections);
-    } catch (err) {
-        console.error("Error fetching sections:", err);
         res.status(500).send({ error: err.message });
     }
 });
