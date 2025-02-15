@@ -143,9 +143,9 @@ app.post('/api/users', async (req, res) => {
     }
 });
 
-// POST create a new teacher account
+// Update the teacher registration route to handle Character field
 app.post('/api/users/teacher', async (req, res) => {
-    const { FirstName, LastName, EmployeeID, Username, Password, Role, AdminApproval } = req.body;
+    const { FirstName, LastName, EmployeeID, Username, Password, Role, AdminApproval, Character } = req.body;
 
     if (!FirstName || !LastName || !EmployeeID || !Username || !Password) {
         return res.status(400).send({ error: 'All fields are required.' });
@@ -165,7 +165,8 @@ app.post('/api/users/teacher', async (req, res) => {
             Password,
             Role: 'Teacher',
             AdminApproval: 'Pending',
-            FullName: `${FirstName} ${LastName}`
+            FullName: `${FirstName} ${LastName}`,
+            Character: Character || 'Teacher' // Use provided Character or default to 'Teacher'
         });
 
         await newTeacher.save();
