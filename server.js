@@ -326,6 +326,47 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     }
 });
 
+// Fix the teacher registration route
+app.post('/api/users/teacher', async (req, res) => {
+    try {
+        console.log("Received teacher registration request:", req.body);
+        
+        const { FirstName, LastName, EmployeeID, Username, Password } = req.body;
+
+        if (!FirstName || !LastName || !EmployeeID || !Username || !Password) {
+            return res.status(400).json({ error: 'All fields are required.' });
+        }
+
+        // Check if username already exists
+        const existingUser = await User.findOne({ Username });
+        if (existingUser) {
+            return res.status(400).json({ error: 'Username already exists.' });
+        }
+
+        // Create new teacher user
+        const newTeacher = new User({
+            Username,
+            Password,
+            Role: 'Teacher',
+            FirstName,
+            LastName,
+            FullName: `${FirstName} ${LastName}`,
+            EmployeeID,
+            AdminApproval: 'Pending',
+            Character: 'Teacher'
+        });
+
+        await newTeacher.save();
+        res.status(201).json({ 
+            message: 'Teacher registration pending approval',
+            user: newTeacher 
+        });
+    } catch (err) {
+        console.error("Teacher registration error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ✅ Start the server
 app.listen(PORT, () => {
     console.log(`Server running on http://192.168.1.11:${PORT}`);
