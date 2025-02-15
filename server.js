@@ -185,15 +185,21 @@ app.post('/api/login', async (req, res) => {
         const user = await User.findOne({ Username });
 
         if (!user) {
-            console.log(`Login failed for username: ${Username}`);
             return res.status(401).send({ message: 'Invalid username or password' });
         }
 
-        // Check AdminApproval for teachers
+        // Check AdminApproval for teachers with specific messages
         if (user.Role === 'Teacher') {
-            if (user.AdminApproval !== 'Approved') {
+            if (user.AdminApproval === 'Pending') {
                 return res.status(401).send({ 
-                    message: 'Your account is pending approval or has been rejected' 
+                    message: 'pending approval',
+                    status: 'Pending'
+                });
+            }
+            if (user.AdminApproval === 'Rejected') {
+                return res.status(401).send({ 
+                    message: 'registration rejected',
+                    status: 'Rejected'
                 });
             }
         }
