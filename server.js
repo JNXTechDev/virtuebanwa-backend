@@ -24,63 +24,77 @@ app.use(bodyParser.json());
 const upload = multer({ dest: 'uploads/' });
 
 // MongoDB connection string
-const mongoURI = process.env.MONGO_URI;
+const mongoURI = "mongodb+srv://vbdb:abcdefghij@cluster0.8i1sn.mongodb.net/Users?retryWrites=true&w=majority";
 
-mongoose.connect(mongoURI)
+mongoose.connect(mongoURI, {
+    serverApi: {
+        version: '1',
+        strict: true,
+        deprecationErrors: true,
+    }
+})
     .then(() => console.log("MongoDB connected"))
     .catch(err => console.error("MongoDB connection error:", err));
 
 // User schema
 const userSchema = new mongoose.Schema({
     Username: { type: String, required: true, unique: true },
-    Password: { type: String, required: function() { return this.Role === 'Admin' || this.Role === 'Teacher'; } },
-    Role: { type: String, required: true, enum: ['Admin', 'Teacher', 'Student'] },
-    // Make these fields required only for non-admin users
+    Password: { type: String, default: 'defaultPassword' }, // Default password for students
+    Role: { type: String, required: true, default: 'Student' }, // Default role is Student
     Section: {
         type: String,
         required: function () {
             return this.Role === 'Student';
         }
     },
-    FirstName: {
-        type: String,
-        required: function () {
-            return this.Role !== 'Admin';
-        }
+    FirstName: { type: String, required: true },
+    LastName: { type: String, required: true },
+    FullName: { type: String, required: true }, // Add FullName field
+    Character: { type: String, required: true },
+    rewards_collected: [{
+        reward: { type: String, required: true },
+        message: { type: String, required: true },
+        date: { type: Date, default: Date.now }
+    }],
+    AdminApproval: { 
+        type: String, 
+        enum: ['Pending', 'Approved', 'Rejected'],
+        default: 'Pending'
     },
-    LastName: {
+    CreatedBy: { 
         type: String,
-        required: function () {
-            return this.Role !== 'Admin';
-        }
-    },
-    FullName: {
-        type: String,
-        required: function () {
-            return this.Role !== 'Admin';
-        }
-    },
-    Character: {
-        type: String,
-        required: function () {
-            return this.Role !== 'Admin';
+        required: function() {
+            return this.Role === 'Student';
         }
     }
 });
 
 const User = mongoose.model('User', userSchema);
 
-// ✅ GET all users (FIXED: Added this missing route)
+// GET all users (FIXED: Added this missing route)
 app.get('/api/users', async (req, res) => {
     try {
-        const users = await User.find({}, '-Password'); // Exclude passwords for security
+        const { teacherUsername } = req.query;
+        let filter = {};
+        
+        // If teacherUsername is provided, filter students created by that teacher
+        if (teacherUsername) {
+            filter = {
+                $and: [
+                    { Role: 'Student' },
+                    { CreatedBy: teacherUsername }
+                ]
+            };
+        }
+
+        const users = await User.find(filter, '-Password'); // Exclude passwords for security
         res.send(users);
     } catch (err) {
         res.status(500).send({ error: err.message });
     }
 });
 
-// ✅ GET user by username
+// GET user by username
 app.get('/api/users/:username', async (req, res) => {
     const { username } = req.params;
     console.log(`Fetching user details for username: ${username}`);
@@ -110,10 +124,14 @@ app.get('/api/users/:username', async (req, res) => {
     }
 });
 
-// ✅ POST create a new user
+// POST create a new user
 app.post('/api/users', async (req, res) => {
-    const { Username, Password, Role, Section, FirstName, LastName, Character } = req.body;
-    console.log("Received data:", { Username, Password, Role, Section });
+    const { Username, Password, Role, Section, FirstName, LastName, Character, CreatedBy } = req.body;
+
+    // Auto-generate FullName from FirstName and LastName
+    const FullName = `${FirstName} ${LastName}`;
+
+    console.log("Received data:", { Username, Password, Role, Section, FirstName, LastName, Character, FullName, CreatedBy });
 
     if (!Username || !Password || !Role || !FirstName || !LastName || !Character) {
         return res.status(400).send({ error: 'Missing required fields.' });
@@ -129,7 +147,19 @@ app.post('/api/users', async (req, res) => {
             return res.status(400).send({ error: 'Username already exists.' });
         }
 
-        const newUser = new User({ Username, Password, Role, Section, FirstName, LastName, Character });
+        // Create new user with auto-generated FullName
+        const newUser = new User({
+            Username,
+            Password,
+            Role,
+            Section,
+            FirstName,
+            LastName,
+            Character,
+            FullName, // Auto-generated FullName
+            CreatedBy: Role === 'Student' ? CreatedBy : undefined
+        });
+
         await newUser.save();
 
         console.log("User created:", newUser);
@@ -139,7 +169,40 @@ app.post('/api/users', async (req, res) => {
     }
 });
 
-// ✅ POST login user
+// Update the teacher registration route to handle Character field
+app.post('/api/users/teacher', async (req, res) => {
+    const { FirstName, LastName, EmployeeID, Username, Password, Role, AdminApproval, Character } = req.body;
+
+    if (!FirstName || !LastName || !EmployeeID || !Username || !Password) {
+        return res.status(400).send({ error: 'All fields are required.' });
+    }
+
+    try {
+        const existingUser = await User.findOne({ Username });
+        if (existingUser) {
+            return res.status(400).send({ error: 'Username already exists.' });
+        }
+
+        const newTeacher = new User({
+            FirstName,
+            LastName,
+            EmployeeID,
+            Username,
+            Password,
+            Role: 'Teacher',
+            AdminApproval: 'Pending',
+            FullName: `${FirstName} ${LastName}`,
+            Character: Character || 'Teacher' // Use provided Character or default to 'Teacher'
+        });
+
+        await newTeacher.save();
+        res.status(201).send({ message: 'Teacher registration pending approval' });
+    } catch (err) {
+        res.status(500).send({ error: err.message });
+    }
+});
+
+// POST login user
 app.post('/api/login', async (req, res) => {
     const { Username, Password } = req.body;
     console.log(`Login attempt for username: ${Username}`);
@@ -148,21 +211,23 @@ app.post('/api/login', async (req, res) => {
         const user = await User.findOne({ Username });
 
         if (!user) {
-            console.log(`Login failed for username: ${Username}`);
             return res.status(401).send({ message: 'Invalid username or password' });
         }
 
-        if (user.Role === 'Admin') {
-            if (user.Password !== Password) {
-                return res.status(401).send({ message: 'Invalid username or password' });
+        // Check AdminApproval for teachers
+        if (user.Role === 'Teacher') {
+            if (user.AdminApproval === 'Pending') {
+                return res.status(401).send({
+                    message: 'Your account is pending approval',
+                    status: 'Pending'
+                });
             }
-            return res.send({
-                message: 'Login successful',
-                user: {
-                    Username: user.Username,
-                    Role: user.Role
-                }
-            });
+            if (user.AdminApproval === 'Rejected') {
+                return res.status(401).send({
+                    message: 'Your account registration has been rejected',
+                    status: 'Rejected'
+                });
+            }
         }
 
         if (user.Role === 'Student') {
@@ -203,7 +268,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// ✅ Classroom schema & routes
+// Classroom schema & routes
 const classroomSchema = new mongoose.Schema({
     name: { type: String, required: true },
     code: { type: String, required: true, unique: true },
@@ -212,7 +277,7 @@ const classroomSchema = new mongoose.Schema({
 
 const Classroom = mongoose.model('Classroom', classroomSchema);
 
-// ✅ POST create a new classroom
+// POST create a new classroom
 app.post('/api/classrooms', async (req, res) => {
     const { name, code, teacherUsername } = req.body;
 
@@ -229,7 +294,7 @@ app.post('/api/classrooms', async (req, res) => {
     }
 });
 
-// ✅ GET classrooms by teacher username
+// GET classrooms by teacher username
 app.get('/api/classrooms', async (req, res) => {
     const { teacherUsername } = req.query;
 
@@ -245,7 +310,7 @@ app.get('/api/classrooms', async (req, res) => {
     }
 });
 
-// ✅ DELETE user by full name
+// DELETE user by full name
 app.delete('/api/users/remove', async (req, res) => {
     const { fullname } = req.query; // Get full name from query parameters
 
@@ -267,7 +332,7 @@ app.delete('/api/users/remove', async (req, res) => {
     }
 });
 
-// ✅ DELETE classroom by code
+// DELETE classroom by code
 app.delete('/api/classrooms/:code', async (req, res) => {
     const { code } = req.params;
 
@@ -279,95 +344,125 @@ app.delete('/api/classrooms/:code', async (req, res) => {
     }
 });
 
-// ✅ POST route for CSV upload
+// POST route for CSV upload
 app.post('/api/upload', upload.single('file'), async (req, res) => {
     if (!req.file) {
         return res.status(400).send({ error: 'No file uploaded.' });
     }
 
+    const teacherUsername = req.body.teacherUsername; // Get teacher username from request
+
     try {
         // Read the CSV file content
         const fileContent = fs.readFileSync(req.file.path, 'utf8');
         const lines = fileContent.split('\n');
+        
+        // Track successful and duplicate entries
+        const stats = {
+            added: 0,
+            duplicates: 0,
+            total: 0
+        };
 
-        // Skip header row and process each line
-        const students = [];
+        // Process each line (skip header)
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim();
             if (line) {
                 const [firstName, lastName, section, username, character] = line.split(',').map(s => s.trim());
+                const fullName = `${firstName} ${lastName}`;
+
                 if (firstName && lastName) {
-                    students.push({
-                        FirstName: firstName,
-                        LastName: lastName,
-                        FullName: `${firstName} ${lastName}`,
-                        Role: 'Student', // Default role is Student
-                        Section: section || '',
-                        Username: username || `${firstName.toLowerCase()}${lastName.toLowerCase()}`,
-                        Character: character || 'Character1',
-                        Password: 'defaultPassword', // Set a default password for students
-                        rewards_collected: []
-                    });
+                    try {
+                        // Check if username already exists
+                        const existingUser = await User.findOne({ Username: username });
+                        
+                        if (!existingUser) {
+                            // Create new user only if username doesn't exist
+                            const newUser = new User({
+                                FirstName: firstName,
+                                LastName: lastName,
+                                FullName: fullName,
+                                Role: 'Student',
+                                Section: section || '',
+                                Username: username,
+                                Character: character || 'Character1',
+                                Password: 'defaultPassword',
+                                rewards_collected: [],
+                                CreatedBy: teacherUsername
+                            });
+                            
+                            await newUser.save();
+                            stats.added++;
+                        } else {
+                            stats.duplicates++;
+                        }
+                        stats.total++;
+                    } catch (err) {
+                        console.error('Error processing student:', err);
+                    }
                 }
             }
         }
 
-        // Insert all students
-        if (students.length > 0) {
-            await User.insertMany(students);
-            fs.unlinkSync(req.file.path); // Clean up uploaded file
-            res.send({ message: 'File processed successfully', count: students.length });
-        } else {
-            res.status(400).send({ error: 'No valid student data found in file' });
-        }
+        // Clean up uploaded file
+        fs.unlinkSync(req.file.path);
+
+        // Send detailed response
+        res.send({
+            message: `File processed successfully. Added ${stats.added} new students, ${stats.duplicates} duplicates skipped.`,
+            count: stats.added,
+            stats: stats
+        });
+
     } catch (err) {
         console.error('Error processing file:', err);
         res.status(500).send({ error: err.message });
     }
 });
 
-// Fix the teacher registration route
-app.post('/api/users/teacher', async (req, res) => {
+// POST route to add a reward to a user
+app.post('/api/users/rewards', async (req, res) => {
+    const { fullName, reward, message } = req.body;
+
+    if (!fullName || !reward || !message) {
+        return res.status(400).send({ error: 'Full name, reward, and message are required.' });
+    }
+
     try {
-        console.log("Received teacher registration request:", req.body);
-        
-        const { FirstName, LastName, EmployeeID, Username, Password } = req.body;
-
-        if (!FirstName || !LastName || !EmployeeID || !Username || !Password) {
-            return res.status(400).json({ error: 'All fields are required.' });
+        const user = await User.findOne({ FullName: fullName });
+        if (!user) {
+            return res.status(404).send({ error: 'User not found.' });
         }
 
-        // Check if username already exists
-        const existingUser = await User.findOne({ Username });
-        if (existingUser) {
-            return res.status(400).json({ error: 'Username already exists.' });
-        }
+        const newReward = {
+            reward,
+            message,
+            date: new Date()
+        };
 
-        // Create new teacher user
-        const newTeacher = new User({
-            Username,
-            Password,
-            Role: 'Teacher',
-            FirstName,
-            LastName,
-            FullName: `${FirstName} ${LastName}`,
-            EmployeeID,
-            AdminApproval: 'Pending',
-            Character: 'Teacher'
-        });
+        user.rewards_collected.push(newReward);
+        await user.save();
 
-        await newTeacher.save();
-        res.status(201).json({ 
-            message: 'Teacher registration pending approval',
-            user: newTeacher 
-        });
+        res.send({ message: 'Reward added successfully', user });
     } catch (err) {
-        console.error("Teacher registration error:", err);
-        res.status(500).json({ error: err.message });
+        res.status(500).send({ error: err.message });
     }
 });
 
-// ✅ Start the server
+// GET unique sections
+app.get('/api/sections', async (req, res) => {
+    try {
+        const users = await User.find({ Section: { $exists: true, $ne: '' } }, 'Section');
+        const uniqueSections = [...new Set(users.map(user => user.Section))].sort();
+        console.log("Found sections:", uniqueSections); // Debug log
+        res.json(uniqueSections);
+    } catch (err) {
+        console.error("Error fetching sections:", err);
+        res.status(500).send({ error: err.message });
+    }
+});
+
+// Start the server
 app.listen(PORT, () => {
     console.log(`Server running on http://192.168.1.11:${PORT}`);
 });
