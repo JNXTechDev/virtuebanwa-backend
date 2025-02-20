@@ -422,32 +422,34 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
 // POST route to add a reward to a user
 app.post('/api/users/rewards', async (req, res) => {
+    console.log("Received Reward Request:", req.body); // ✅ LOG INCOMING DATA
+
     const { fullName, reward, message } = req.body;
 
     if (!fullName || !reward || !message) {
+        console.log("❌ Missing required fields:", { fullName, reward, message });
         return res.status(400).send({ error: 'Full name, reward, and message are required.' });
     }
 
     try {
         const user = await User.findOne({ FullName: fullName });
         if (!user) {
+            console.log("❌ User not found:", fullName);
             return res.status(404).send({ error: 'User not found.' });
         }
 
-        const newReward = {
-            reward,
-            message,
-            date: new Date()
-        };
-
+        const newReward = { reward, message, date: new Date() };
         user.rewards_collected.push(newReward);
         await user.save();
 
+        console.log("✅ Reward added successfully:", newReward);
         res.send({ message: 'Reward added successfully', user });
     } catch (err) {
+        console.error("❌ Error adding reward:", err.message);
         res.status(500).send({ error: err.message });
     }
 });
+
 
 // GET unique sections
 app.get('/api/sections', async (req, res) => {
@@ -459,6 +461,53 @@ app.get('/api/sections', async (req, res) => {
     } catch (err) {
         console.error("Error fetching sections:", err);
         res.status(500).send({ error: err.message });
+    }
+});
+
+
+
+
+// Game Progress Schema
+const gameProgressSchema = new mongoose.Schema({
+    username: { type: String, required: true },
+    unit: { type: String, required: true },
+    lesson: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now }
+});
+
+const GameProgress = mongoose.model("GameProgress", gameProgressSchema);
+
+// POST - Save game progress
+app.post('/api/game_progress', async (req, res) => {
+    try {
+        const { username, unit, lesson } = req.body;
+
+        if (!username || !unit || !lesson) {
+            return res.status(400).json({ error: "Username, unit, and lesson are required." });
+        }
+
+        const progress = new GameProgress({ username, unit, lesson });
+        await progress.save();
+
+        res.json({ message: "Game progress saved successfully", progress });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET - Fetch user progress
+app.get('/api/game_progress/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        const progress = await GameProgress.find({ username });
+
+        if (!progress) {
+            return res.status(404).json({ error: "No progress found for this user." });
+        }
+
+        res.json(progress);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
