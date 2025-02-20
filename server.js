@@ -500,76 +500,48 @@ app.get('/api/sections', async (req, res) => {
 // Updated Game Progress Schema
 const gameProgressSchema = new mongoose.Schema({
     username: { type: String, required: true },
-    units: [{
-        unitName: { type: String, required: true },
-        lessons: [{
-            lessonName: { type: String, required: true },
-            status: { type: String, enum: ['COMPLETE', 'ON GOING'], default: 'ON GOING' },
-            rewards: [{
-                reward: { type: String, required: true },
-                message: { type: String, required: true },
-                timestamp: { type: Date, default: Date.now }
-            }]
-        }]
-    }]
+    tutorial: {
+        status: { type: String, default: 'Not Started' },
+        reward: { type: String, default: '' },
+        date: { type: Date }
+    },
+    lessons: {
+        Unit1_Lesson1: {
+            status: { type: String, default: 'Not Started' },
+            reward: { type: String, default: '' },
+            date: { type: Date }
+        }
+    }
 }, { collection: "game_progress" });
 
 const GameProgress = mongoose.model("GameProgress", gameProgressSchema);
 
-
-// POST - Save game progress (Fix the progress saving)
+// POST - Save game progress
 app.post('/api/game_progress', async (req, res) => {
     try {
-        const { username, unit, lesson, reward, message } = req.body;
+        const { username, tutorial, lessons } = req.body;
 
-        if (!username || !unit || !lesson) {
-            return res.status(400).json({ error: "Username, unit, and lesson are required." });
+        if (!username) {
+            return res.status(400).json({ error: "Username is required." });
         }
 
         let progress = await GameProgress.findOne({ username });
 
         if (!progress) {
-            // Create new progress document if none exists
             progress = new GameProgress({
                 username,
-                units: [{
-                    unitName: unit,
-                    lessons: [{
-                        lessonName: lesson,
-                        status: 'COMPLETE',
-                        rewards: reward && message ? [{ reward, message }] : []
-                    }]
-                }]
+                tutorial: tutorial || {},
+                lessons: lessons || {}
             });
         } else {
-            // Find or create unit
-            let unitDoc = progress.units.find(u => u.unitName === unit);
-            if (!unitDoc) {
-                unitDoc = {
-                    unitName: unit,
-                    lessons: []
-                };
-                progress.units.push(unitDoc);
+            if (tutorial) {
+                progress.tutorial = tutorial;
             }
-
-            // Find or create lesson
-            let lessonDoc = unitDoc.lessons.find(l => l.lessonName === lesson);
-            if (!lessonDoc) {
-                lessonDoc = {
-                    lessonName: lesson,
-                    status: 'COMPLETE',
-                    rewards: []
+            if (lessons) {
+                progress.lessons = {
+                    ...progress.lessons,
+                    ...lessons
                 };
-                unitDoc.lessons.push(lessonDoc);
-            }
-
-            // Add reward if provided
-            if (reward && message) {
-                lessonDoc.rewards.push({
-                    reward,
-                    message,
-                    timestamp: new Date()
-                });
             }
         }
 
@@ -585,10 +557,24 @@ app.post('/api/game_progress', async (req, res) => {
 app.get('/api/game_progress/:username', async (req, res) => {
     try {
         const { username } = req.params;
-        const progress = await GameProgress.find({ username });
+        const progress = await GameProgress.findOne({ username });
 
         if (!progress) {
-            return res.status(404).json({ error: "No progress found for this user." });
+            return res.json({
+                username,
+                tutorial: {
+                    status: "Not Started",
+                    reward: "",
+                    date: null
+                },
+                lessons: {
+                    Unit1_Lesson1: {
+                        status: "Not Started",
+                        reward: "",
+                        date: null
+                    }
+                }
+            });
         }
 
         res.json(progress);
