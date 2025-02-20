@@ -466,16 +466,16 @@ app.get('/api/sections', async (req, res) => {
 
 
 
-
-// Game Progress Schema
+// Game Progress Schema (Ensure it's a separate collection)
 const gameProgressSchema = new mongoose.Schema({
     username: { type: String, required: true },
     unit: { type: String, required: true },
     lesson: { type: String, required: true },
     timestamp: { type: Date, default: Date.now }
-});
+}, { collection: "game_progress" });  // ✅ Explicit collection name
 
 const GameProgress = mongoose.model("GameProgress", gameProgressSchema);
+
 
 // POST - Save game progress
 app.post('/api/game_progress', async (req, res) => {
