@@ -124,6 +124,37 @@ app.get('/api/users/:username', async (req, res) => {
     }
 });
 
+// GET user by full name (Add this new endpoint)
+app.get('/api/users/byname', async (req, res) => {
+    const { fullname } = req.query;
+    console.log(`Fetching user details for full name: ${fullname}`);
+
+    if (!fullname) {
+        return res.status(400).send({ error: 'Full name is required' });
+    }
+
+    try {
+        const user = await User.findOne({ FullName: fullname });
+        if (!user) {
+            console.log(`User not found with full name: ${fullname}`);
+            return res.status(404).send({ error: 'User not found.' });
+        }
+
+        console.log(`Found user: ${user.Username}`);
+        res.send({
+            Username: user.Username,
+            Role: user.Role,
+            Section: user.Section,
+            FirstName: user.FirstName,
+            LastName: user.LastName,
+            Character: user.Character
+        });
+    } catch (err) {
+        console.error(`Error fetching user by name: ${err.message}`);
+        res.status(500).send({ error: err.message });
+    }
+});
+
 // POST create a new user
 app.post('/api/users', async (req, res) => {
     const { Username, Password, Role, Section, FirstName, LastName, Character, CreatedBy } = req.body;
@@ -486,7 +517,7 @@ const gameProgressSchema = new mongoose.Schema({
 const GameProgress = mongoose.model("GameProgress", gameProgressSchema);
 
 
-// POST - Save game progress
+// POST - Save game progress (Fix the progress saving)
 app.post('/api/game_progress', async (req, res) => {
     try {
         const { username, unit, lesson, reward, message } = req.body;
@@ -495,40 +526,11 @@ app.post('/api/game_progress', async (req, res) => {
             return res.status(400).json({ error: "Username, unit, and lesson are required." });
         }
 
-        const progress = await GameProgress.findOne({ username });
+        let progress = await GameProgress.findOne({ username });
 
-        if (progress) {
-            const unitIndex = progress.units.findIndex(u => u.unitName === unit);
-            if (unitIndex > -1) {
-                const lessonIndex = progress.units[unitIndex].lessons.findIndex(l => l.lessonName === lesson);
-                if (lessonIndex > -1) {
-                    // Update existing lesson
-                    progress.units[unitIndex].lessons[lessonIndex].status = 'COMPLETE';
-                    if (reward && message) {
-                        progress.units[unitIndex].lessons[lessonIndex].rewards.push({ reward, message });
-                    }
-                } else {
-                    // Add new lesson
-                    progress.units[unitIndex].lessons.push({
-                        lessonName: lesson,
-                        status: 'COMPLETE',
-                        rewards: reward && message ? [{ reward, message }] : []
-                    });
-                }
-            } else {
-                // Add new unit and lesson
-                progress.units.push({
-                    unitName: unit,
-                    lessons: [{
-                        lessonName: lesson,
-                        status: 'COMPLETE',
-                        rewards: reward && message ? [{ reward, message }] : []
-                    }]
-                });
-            }
-        } else {
-            // Create new progress document
-            const newProgress = new GameProgress({
+        if (!progress) {
+            // Create new progress document if none exists
+            progress = new GameProgress({
                 username,
                 units: [{
                     unitName: unit,
@@ -539,12 +541,42 @@ app.post('/api/game_progress', async (req, res) => {
                     }]
                 }]
             });
-            await newProgress.save();
+        } else {
+            // Find or create unit
+            let unitDoc = progress.units.find(u => u.unitName === unit);
+            if (!unitDoc) {
+                unitDoc = {
+                    unitName: unit,
+                    lessons: []
+                };
+                progress.units.push(unitDoc);
+            }
+
+            // Find or create lesson
+            let lessonDoc = unitDoc.lessons.find(l => l.lessonName === lesson);
+            if (!lessonDoc) {
+                lessonDoc = {
+                    lessonName: lesson,
+                    status: 'COMPLETE',
+                    rewards: []
+                };
+                unitDoc.lessons.push(lessonDoc);
+            }
+
+            // Add reward if provided
+            if (reward && message) {
+                lessonDoc.rewards.push({
+                    reward,
+                    message,
+                    timestamp: new Date()
+                });
+            }
         }
 
         await progress.save();
         res.json({ message: "Game progress saved successfully", progress });
     } catch (err) {
+        console.error('Error saving game progress:', err);
         res.status(500).json({ error: err.message });
     }
 });
