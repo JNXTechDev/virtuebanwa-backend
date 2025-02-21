@@ -528,7 +528,7 @@ app.post('/api/game_progress', async (req, res) => {
         
         if (!progress) {
             progress = new GameProgress({
-                username,
+                Username,
                 tutorial: tutorial || {},
                 lessons: lessons || {}
             });
