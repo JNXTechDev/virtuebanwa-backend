@@ -124,7 +124,7 @@ app.get('/api/users/:username', async (req, res) => {
     }
 });
 
-// GET user by full name (Add this new endpoint)
+// GET user by full name (Updated to handle case insensitive search)
 app.get('/api/users/byname', async (req, res) => {
     const { fullname } = req.query;
     console.log(`Fetching user details for full name: ${fullname}`);
@@ -134,7 +134,13 @@ app.get('/api/users/byname', async (req, res) => {
     }
 
     try {
-        const user = await User.findOne({ FullName: fullname });
+        // Use case-insensitive regex search
+        const user = await User.findOne({ 
+            FullName: { 
+                $regex: new RegExp(`^${fullname}$`, 'i') 
+            }
+        });
+
         if (!user) {
             console.log(`User not found with full name: ${fullname}`);
             return res.status(404).send({ error: 'User not found.' });
@@ -498,7 +504,7 @@ app.get('/api/sections', async (req, res) => {
 
 // Updated Game Progress Schema
 const gameProgressSchema = new mongoose.Schema({
-    Username: { type: String, required: true },
+    Username: { type: String, required: true }, // Changed from username to Username
     tutorial: {
         status: { type: String, default: 'Not Started' },
         reward: { type: String, default: '' },
@@ -564,11 +570,11 @@ app.get('/api/game_progress/byname/:fullname', async (req, res) => {
         }
 
         // 🆔 Now, use Username to fetch game progress
-        const progress = await GameProgress.findOne({ Username: user.Username });
+        const progress = await GameProgress.findOne({ Username: user.Username }); // Changed from username to Username
 
         if (!progress) {
             return res.json({
-                Username: user.Username,
+                Username: user.Username, // Changed from username to Username
                 tutorial: { status: "Not Started", reward: "", date: null },
                 lessons: {}
             });
