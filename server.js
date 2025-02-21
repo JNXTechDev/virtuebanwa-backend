@@ -518,14 +518,14 @@ const GameProgress = mongoose.model("GameProgress", gameProgressSchema);
 // POST - Save game progress
 app.post('/api/game_progress', async (req, res) => {
     try {
-        const { username, tutorial, lessons } = req.body;
+        const { Username, tutorial, lessons } = req.body;
 
-        if (!username) {
+        if (!Username) {
             return res.status(400).json({ error: "Username is required." });
         }
-
-        let progress = await GameProgress.findOne({ username });
-
+        
+        let progress = await GameProgress.findOne({ Username });
+        
         if (!progress) {
             progress = new GameProgress({
                 username,
