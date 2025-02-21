@@ -496,10 +496,9 @@ app.get('/api/sections', async (req, res) => {
 });
 
 
-
 // Updated Game Progress Schema
 const gameProgressSchema = new mongoose.Schema({
-    username: { type: String, required: true },
+    Username: { type: String, required: true },
     tutorial: {
         status: { type: String, default: 'Not Started' },
         reward: { type: String, default: '' },
@@ -554,26 +553,24 @@ app.post('/api/game_progress', async (req, res) => {
 });
 
 // GET - Fetch user progress
-app.get('/api/game_progress/:username', async (req, res) => {
+app.get('/api/game_progress/byname/:fullname', async (req, res) => {
     try {
-        const { username } = req.params;
-        const progress = await GameProgress.findOne({ username });
+        const { fullname } = req.params;
+
+        // 🔎 First, find Username using FullName from users collection
+        const user = await User.findOne({ FullName: fullname });
+        if (!user) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        // 🆔 Now, use Username to fetch game progress
+        const progress = await GameProgress.findOne({ Username: user.Username });
 
         if (!progress) {
             return res.json({
-                username,
-                tutorial: {
-                    status: "Not Started",
-                    reward: "",
-                    date: null
-                },
-                lessons: {
-                    Unit1_Lesson1: {
-                        status: "Not Started",
-                        reward: "",
-                        date: null
-                    }
-                }
+                Username: user.Username,
+                tutorial: { status: "Not Started", reward: "", date: null },
+                lessons: {}
             });
         }
 
@@ -582,6 +579,7 @@ app.get('/api/game_progress/:username', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
 
 // Start the server
 app.listen(PORT, () => {
