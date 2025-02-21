@@ -564,7 +564,8 @@ app.get('/api/game_progress/byname/:fullname', async (req, res) => {
         const { fullname } = req.params;
 
         // 🔎 First, find Username using FullName from users collection
-        const user = await User.findOne({ FullName: fullname });
+        const user = await User.findOne({ FullName: new RegExp(`^${fullname}$`, 'i') });
+        console.log("Requested FullName:", fullname);
         if (!user) {
             return res.status(404).json({ error: "User not found." });
         }
