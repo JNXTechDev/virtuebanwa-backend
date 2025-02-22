@@ -94,7 +94,64 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
-// GET user by username
+// Important: Place specific routes BEFORE parameterized routes
+// GET user by full name
+app.get('/api/users/byname', async (req, res) => {
+    const { fullname } = req.query;
+    const trimmedName = fullname ? fullname.trim() : '';
+    
+    console.log(`[Server] Raw fullname: "${fullname}"`);
+    console.log(`[Server] Trimmed fullname: "${trimmedName}"`);
+
+    if (!trimmedName) {
+        return res.status(400).send({ error: 'Full name is required' });
+    }
+
+    try {
+        // Log all users first for debugging
+        const allUsers = await User.find({}, 'FullName Role Username');
+        console.log('[Server] All users in database:');
+        allUsers.forEach(u => {
+            console.log(`  "${u.FullName}" (${u.Role})`);
+        });
+
+        // Try exact match first
+        let user = await User.findOne({ FullName: trimmedName });
+        console.log('[Server] Exact match result:', user ? 'Found' : 'Not found');
+
+        if (!user) {
+            // Try case-insensitive match
+            const query = { 
+                FullName: { 
+                    $regex: new RegExp(`^${trimmedName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') 
+                }
+            };
+            console.log('[Server] Trying case-insensitive search:', JSON.stringify(query));
+            
+            user = await User.findOne(query);
+            console.log('[Server] Case-insensitive match result:', user ? 'Found' : 'Not found');
+        }
+
+        if (!user) {
+            console.log(`[Server] No user found with name: "${trimmedName}"`);
+            return res.status(404).send({ error: 'User not found.' });
+        }
+
+        res.send({
+            Username: user.Username,
+            Role: user.Role,
+            Section: user.Section,
+            FirstName: user.FirstName,
+            LastName: user.LastName,
+            Character: user.Character
+        });
+    } catch (err) {
+        console.error('[Server] Error:', err);
+        res.status(500).send({ error: err.message });
+    }
+});
+
+// AFTER the byname route, place the parameterized route
 app.get('/api/users/:username', async (req, res) => {
     const { username } = req.params;
     console.log(`Fetching user details for username: ${username}`);
@@ -120,43 +177,6 @@ app.get('/api/users/:username', async (req, res) => {
         });
     } catch (err) {
         console.error(`Error fetching user details: ${err.message}`);
-        res.status(500).send({ error: err.message });
-    }
-});
-
-// GET user by full name (Updated to handle case insensitive search)
-app.get('/api/users/byname', async (req, res) => {
-    const { fullname } = req.query;
-    console.log(`Fetching user details for full name: ${fullname}`);
-
-    if (!fullname) {
-        return res.status(400).send({ error: 'Full name is required' });
-    }
-
-    try {
-        // Use case-insensitive regex search
-        const user = await User.findOne({ 
-            FullName: { 
-                $regex: new RegExp(`^${fullname}$`, 'i') 
-            }
-        });
-
-        if (!user) {
-            console.log(`User not found with full name: ${fullname}`);
-            return res.status(404).send({ error: 'User not found.' });
-        }
-
-        console.log(`Found user: ${user.Username}`);
-        res.send({
-            Username: user.Username,
-            Role: user.Role,
-            Section: user.Section,
-            FirstName: user.FirstName,
-            LastName: user.LastName,
-            Character: user.Character
-        });
-    } catch (err) {
-        console.error(`Error fetching user by name: ${err.message}`);
         res.status(500).send({ error: err.message });
     }
 });
@@ -504,19 +524,37 @@ app.get('/api/sections', async (req, res) => {
 
 // Updated Game Progress Schema
 const gameProgressSchema = new mongoose.Schema({
-    Username: { type: String, required: true }, // Changed from username to Username
+    Username: { type: String, required: true },
     tutorial: {
         status: { type: String, default: 'Not Started' },
         reward: { type: String, default: '' },
         date: { type: Date }
     },
-    lessons: {
-        Unit1_Lesson1: {
+    units: {
+        Unit1: {
             status: { type: String, default: 'Not Started' },
-            reward: { type: String, default: '' },
-            date: { type: Date }
-        }
-    }
+            completedLessons: { type: Number, default: 0 },
+            unitScore: { type: Number, default: 0 },
+            lessons: {
+                Lesson1: {
+                    status: { type: String, default: 'Available' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                // Add Lesson2 through Lesson10 with the same structure
+            },
+            postTest: {
+                status: { type: String, default: 'Locked' },
+                score: { type: Number, default: 0 },
+                completionDate: { type: Date },
+                reward: { type: String, default: '' }
+            }
+        },
+        // Add Unit2 through Unit4 with the same structure
+    },
+    currentUnit: { type: String, default: 'Unit1' },
+    currentLesson: { type: String, default: 'Lesson1' }
 }, { collection: "game_progress" });
 
 const GameProgress = mongoose.model("GameProgress", gameProgressSchema);
@@ -559,36 +597,30 @@ app.post('/api/game_progress', async (req, res) => {
 });
 
 // GET - Fetch user progress
-app.get('/api/game_progress/byname/:fullname', async (req, res) => {
-    try {
-        const { fullname } = req.params;
+app.get('/api/game_progress/:username', async (req, res) => {
 
-        // 🔎 First, find Username using FullName from users collection
-        const user = await User.findOne({ FullName: new RegExp(`^${fullname}$`, 'i') });
-        console.log("Requested FullName:", fullname);
-        if (!user) {
-            return res.status(404).json({ error: "User not found." });
-        }
-
+        try {
+            const {username} = req.params;
         // 🆔 Now, use Username to fetch game progress
-        const progress = await GameProgress.findOne({ Username: user.Username }); // Changed from username to Username
+        const progress = await GameProgress.findOne({ Username: username }); 
 
         if (!progress) {
             return res.json({
-                Username: user.Username, // Changed from username to Username
+                Username: username, // Changed from username to Username
                 tutorial: { status: "Not Started", reward: "", date: null },
                 lessons: {}
             });
         }
 
         res.json(progress);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+    } catch (error) {
+        console.error('Error fetching game progress:', error);
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
 
 // Start the server
 app.listen(PORT, () => {
-    console.log(`Server running on http://192.168.1.11:${PORT}`);
+    console.log(`Server running on http://192.168.1.4:${PORT}`);
 });
