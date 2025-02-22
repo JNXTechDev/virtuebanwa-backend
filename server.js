@@ -562,37 +562,67 @@ const GameProgress = mongoose.model("GameProgress", gameProgressSchema);
 // POST - Save game progress
 app.post('/api/game_progress', async (req, res) => {
     try {
-        const { Username, tutorial, lessons } = req.body;
-
+        console.log("Received request body:", req.body);
+        const { Username, tutorial, unit, lesson, reward, message } = req.body;
+        
         if (!Username) {
             return res.status(400).json({ error: "Username is required." });
         }
-        
+
         let progress = await GameProgress.findOne({ Username });
-        
+
+        // If no progress exists, create new
         if (!progress) {
             progress = new GameProgress({
                 Username,
-                tutorial: tutorial || {},
-                lessons: lessons || {}
+                tutorial: {
+                    status: "Not Started",
+                    reward: "",
+                    date: new Date()
+                },
+                units: {
+                    Unit1: {
+                        status: "Not Started",
+                        completedLessons: 0,
+                        unitScore: 0,
+                        lessons: {
+                            Lesson1: {
+                                status: "Available",
+                                reward: "",
+                                score: 0,
+                                lastAttempt: new Date()
+                            }
+                        }
+                    }
+                },
+                currentUnit: "Unit1",
+                currentLesson: "Lesson1"
             });
-        } else {
-            if (tutorial) {
-                progress.tutorial = tutorial;
-            }
-            if (lessons) {
-                progress.lessons = {
-                    ...progress.lessons,
-                    ...lessons
-                };
-            }
         }
 
-        await progress.save();
-        res.json({ message: "Game progress saved successfully", progress });
-    } catch (err) {
-        console.error('Error saving game progress:', err);
-        res.status(500).json({ error: err.message });
+        // Update tutorial data from request
+        if (tutorial) {
+            progress.tutorial = {
+                status: tutorial.status || "Not Started", // Use provided status or default
+                reward: tutorial.reward || progress.tutorial.reward,
+                date: tutorial.date ? new Date(tutorial.date) : new Date()
+            };
+        }
+
+        // Update unit and lesson if provided
+        if (unit) progress.currentUnit = unit;
+        if (lesson) progress.currentLesson = lesson;
+
+        // Save and return updated progress
+        const savedProgress = await progress.save();
+        console.log("Saved progress:", savedProgress);
+        res.json({ 
+            message: "Game progress saved successfully", 
+            progress: savedProgress 
+        });
+    } catch (error) {
+        console.error("Error saving game progress:", error);
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -619,6 +649,48 @@ app.get('/api/game_progress/:username', async (req, res) => {
     }
 });
 
+// Update the SaveChoice route
+app.post('/api/saveChoice', async (req, res) => {
+    try {
+        const { username, unit, lesson, sceneName, selectedChoice } = req.body;
+        
+        // Find the user's progress
+        let progress = await GameProgress.findOne({ Username: username });
+        
+        // If no progress exists, create new progress
+        if (!progress) {
+            progress = new GameProgress({
+                Username: username,
+                tutorial: {
+                    status: "Not Started",
+                    reward: "",
+                    date: null
+                },
+                units: {
+                    Unit1: {
+                        status: "Not Started",
+                        completedLessons: 0,
+                        unitScore: 0,
+                        lessons: {
+                            Lesson1: {
+                                status: "Available",
+                                reward: "",
+                                score: 0,
+                                lastAttempt: new Date()
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        await progress.save();
+        res.json({ message: "Choice saved successfully", progress });
+    } catch (error) {
+        console.error("Error saving choice:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Start the server
 app.listen(PORT, () => {
