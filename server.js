@@ -542,7 +542,36 @@ const gameProgressSchema = new mongoose.Schema({
                     score: { type: Number, default: 0 },
                     lastAttempt: { type: Date }
                 },
-                // Add Lesson2 through Lesson10 with the same structure
+                Lesson2: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson3: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson4: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson5: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson6: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                }
             },
             postTest: {
                 status: { type: String, default: 'Locked' },
@@ -551,7 +580,153 @@ const gameProgressSchema = new mongoose.Schema({
                 reward: { type: String, default: '' }
             }
         },
-        // Add Unit2 through Unit4 with the same structure
+        Unit2: {
+            status: { type: String, default: 'Not Started' },
+            completedLessons: { type: Number, default: 0 },
+            unitScore: { type: Number, default: 0 },
+            lessons: {
+                Lesson1: {
+                    status: { type: String, default: 'Available' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson2: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson3: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson4: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson5: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson6: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                }
+            },
+            postTest: {
+                status: { type: String, default: 'Locked' },
+                score: { type: Number, default: 0 },
+                completionDate: { type: Date },
+                reward: { type: String, default: '' }
+            }
+        },
+        Unit3: {
+            status: { type: String, default: 'Not Started' },
+            completedLessons: { type: Number, default: 0 },
+            unitScore: { type: Number, default: 0 },
+            lessons: {
+                Lesson1: {
+                    status: { type: String, default: 'Available' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson2: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson3: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson4: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson5: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson6: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                }
+            },
+            postTest: {
+                status: { type: String, default: 'Locked' },
+                score: { type: Number, default: 0 },
+                completionDate: { type: Date },
+                reward: { type: String, default: '' }
+            }
+        },
+        Unit4: {
+            status: { type: String, default: 'Not Started' },
+            completedLessons: { type: Number, default: 0 },
+            unitScore: { type: Number, default: 0 },
+            lessons: {
+                Lesson1: {
+                    status: { type: String, default: 'Available' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson2: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson3: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson4: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson5: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                },
+                Lesson6: {
+                    status: { type: String, default: 'Locked' },
+                    reward: { type: String, default: '' },
+                    score: { type: Number, default: 0 },
+                    lastAttempt: { type: Date }
+                }
+            },
+            postTest: {
+                status: { type: String, default: 'Locked' },
+                score: { type: Number, default: 0 },
+                completionDate: { type: Date },
+                reward: { type: String, default: '' }
+            }
+        }
     },
     currentUnit: { type: String, default: 'Unit1' },
     currentLesson: { type: String, default: 'Lesson1' }
@@ -563,63 +738,73 @@ const GameProgress = mongoose.model("GameProgress", gameProgressSchema);
 app.post('/api/game_progress', async (req, res) => {
     try {
         console.log("Received request body:", req.body);
-        const { Username, tutorial, unit, lesson, reward, message } = req.body;
+        const { Username, tutorial, unit, lesson, reward, message, units } = req.body;
         
         if (!Username) {
             return res.status(400).json({ error: "Username is required." });
         }
 
+        // Get lesson number from lesson string
+        const lessonMatch = lesson.match(/Lesson (\d+)/);
+        const lessonNumber = lessonMatch ? parseInt(lessonMatch[1]) : 1;
+        const lessonKey = `Lesson${lessonNumber}`;
+
         let progress = await GameProgress.findOne({ Username });
 
-        // If no progress exists, create new
+        // Get the correct score from the units data
+        const lessonScore = units?.Unit1?.lessons?.[lessonKey]?.score ?? 30; // Default to 30 if not provided
+        console.log(`Using score for ${lessonKey}:`, lessonScore); // Debug log
+
         if (!progress) {
+            // Create new progress document with the correct score
             progress = new GameProgress({
                 Username,
                 tutorial: {
-                    status: "Not Started",
-                    reward: "",
-                    date: new Date()
+                    status: tutorial?.status || "Not Started",
+                    reward: tutorial?.reward || "",
+                    date: tutorial?.date ? new Date(tutorial.date) : new Date()
                 },
                 units: {
                     Unit1: {
-                        status: "Not Started",
-                        completedLessons: 0,
-                        unitScore: 0,
+                        status: "In Progress",
+                        completedLessons: lessonNumber,
+                        unitScore: lessonScore, // Use the lesson score
                         lessons: {
-                            Lesson1: {
-                                status: "Available",
-                                reward: "",
-                                score: 0,
+                            [lessonKey]: {
+                                status: "Completed",
+                                reward: reward || "",
+                                score: lessonScore, // Use the lesson score
                                 lastAttempt: new Date()
                             }
                         }
                     }
                 },
-                currentUnit: "Unit1",
-                currentLesson: "Lesson1"
+                currentUnit: unit,
+                currentLesson: lesson
             });
-        }
+        } else {
+            // Update existing progress with correct score
+            if (!progress.units.Unit1.lessons) {
+                progress.units.Unit1.lessons = {};
+            }
 
-        // Update tutorial data from request
-        if (tutorial) {
-            progress.tutorial = {
-                status: tutorial.status || "Not Started", // Use provided status or default
-                reward: tutorial.reward || progress.tutorial.reward,
-                date: tutorial.date ? new Date(tutorial.date) : new Date()
+            progress.units.Unit1.lessons[lessonKey] = {
+                status: "Completed",
+                reward: reward || "",
+                score: lessonScore, // Use the lesson score
+                lastAttempt: new Date()
             };
+
+            progress.units.Unit1.completedLessons = lessonNumber;
+            progress.units.Unit1.unitScore = lessonScore; // Update unit score
+            progress.units.Unit1.status = "In Progress";
+            progress.currentUnit = unit;
+            progress.currentLesson = lesson;
         }
 
-        // Update unit and lesson if provided
-        if (unit) progress.currentUnit = unit;
-        if (lesson) progress.currentLesson = lesson;
-
-        // Save and return updated progress
-        const savedProgress = await progress.save();
-        console.log("Saved progress:", savedProgress);
-        res.json({ 
-            message: "Game progress saved successfully", 
-            progress: savedProgress 
-        });
+        await progress.save();
+        console.log("Saved progress:", progress);
+        res.json({ message: "Game progress saved successfully", progress });
     } catch (error) {
         console.error("Error saving game progress:", error);
         res.status(500).json({ error: error.message });
@@ -691,6 +876,88 @@ app.post('/api/saveChoice', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+
+//test to postman to get all teachers with pending/approved/rejected status
+// Fetch all teachers with pending approval status
+app.get('/api/teacher/pending', async (req, res) => {
+    try {
+        // Find all users with the role "Teacher" and AdminApproval set to "Pending"
+        const pendingTeachers = await User.find(
+            { 
+                Role: 'Teacher', 
+                AdminApproval: 'Pending' 
+            },
+            '-Password' // Exclude the password field for security
+        );
+
+        // If no pending teachers are found, return a 404 response
+        if (!pendingTeachers || pendingTeachers.length === 0) {
+            return res.status(404).json({ message: 'No pending teachers found.' });
+        }
+
+        // Return the list of pending teachers
+        res.json(pendingTeachers);
+    } catch (err) {
+        console.error('Error fetching pending teachers:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Fetch all teachers with rejected status
+app.get('/api/teacher/rejected', async (req, res) => {
+    try {
+        // Find all users with the role "Teacher" and AdminApproval set to "Rejected"
+        const rejectedTeachers = await User.find(
+            { 
+                Role: 'Teacher', 
+                AdminApproval: 'Rejected' 
+            },
+            '-Password' // Exclude the password field for security
+        );
+
+        // If no rejected teachers are found, return a 404 response
+        if (!rejectedTeachers || rejectedTeachers.length === 0) {
+            return res.status(404).json({ message: 'No rejected found.' });
+        }
+
+        // Return the list of rejected teachers
+        res.json(rejectedTeachers);
+    } catch (err) {
+        console.error('Error fetching rejected teachers:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// Fetch all teachers with approved status
+app.get('/api/teacher/approved', async (req, res) => {
+    try {
+        // Find all users with the role "Teacher" and AdminApproval set to "Rejected"
+        const approvedTeachers = await User.find(
+            { 
+                Role: 'Teacher', 
+                AdminApproval: 'Approved' 
+            },
+            '-Password' // Exclude the password field for security
+        );
+
+        // If no approved teachers are found, return a 404 response
+        if (!approvedTeachers || approvedTeachers.length === 0) {
+            return res.status(404).json({ message: 'No approved found.' });
+        }
+
+        // Return the list of rejected teachers
+        res.json(approvedTeachers);
+    } catch (err) {
+        console.error('Error fetching approved teachers:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+
+
 
 // Start the server
 app.listen(PORT, () => {
