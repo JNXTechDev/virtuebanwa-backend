@@ -751,7 +751,7 @@ app.post('/api/game_progress', async (req, res) => {
     try {
         console.log('Received progress update:', JSON.stringify(req.body, null, 2));
         
-        const { Username, tutorial, units } = req.body;
+        const { Username, tutorial, units, currentUnit, currentLesson } = req.body;
         
         if (!Username) {
             return res.status(400).json({ error: 'Username is required' });
@@ -775,74 +775,41 @@ app.post('/api/game_progress', async (req, res) => {
             // Get current time for consistency
             const updateTime = new Date();
             
-            // Check NPCs talked to from both incoming request and existing data
-            let allNpcsCompleted = [];
-            let npcRewards = {};
-            
-            // Add NPCs from the incoming request and collect their rewards
-            if (units && units.Unit1?.lessons?.Lesson1?.npcsTalkedTo) {
-                allNpcsCompleted = [...units.Unit1.lessons.Lesson1.npcsTalkedTo];
+            // Check if there are specific tutorial checkpoints to update
+            if (tutorial.checkpoints) {
+                const checkpointKeys = Object.keys(tutorial.checkpoints);
                 
-                // If there's a rewards object, capture the rewards data
-                if (units.Unit1?.lessons?.Lesson1?.rewards) {
-                    npcRewards = units.Unit1.lessons.Lesson1.rewards;
-                }
-            }
-            
-            // Add NPCs from existing data if available
-            if (progress.units?.Unit1?.lessons?.Lesson1?.npcsTalkedTo) {
-                const existingNPCs = progress.units.Unit1.lessons.Lesson1.npcsTalkedTo;
-                existingNPCs.forEach(npc => {
-                    if (!allNpcsCompleted.includes(npc)) {
-                        allNpcsCompleted.push(npc);
+                checkpointKeys.forEach(npcName => {
+                    const checkpointData = tutorial.checkpoints[npcName];
+                    
+                    // Only update if we have valid checkpoint data
+                    if (checkpointData && checkpointData.status) {
+                        progress.tutorial.checkpoints.set(npcName, {
+                            reward: checkpointData.reward || tutorial.reward || "OneStar",
+                            status: checkpointData.status,
+                            date: checkpointData.date ? new Date(checkpointData.date) : updateTime,
+                            message: checkpointData.message || "Tutorial Progress"
+                        });
                     }
                 });
-            }
-            
-            console.log("Combined NPCs from all sources:", allNpcsCompleted);
-            console.log("NPC Rewards:", npcRewards);
-            
-            // Update tutorial checkpoints
-            allNpcsCompleted.forEach(npcName => {
-                // Get the reward from the incoming data or use existing checkpoint data
-                const rewardData = npcRewards[npcName] || tutorial.checkpoints?.[npcName] || { 
-                    reward: tutorial.reward || "OneStar",
-                    message: "Tutorial Progress"
-                };
                 
-                // Only update if this NPC is newly completed or doesn't have a checkpoint yet
-                if (!progress.tutorial.checkpoints.has(npcName) || tutorial.checkpoints?.[npcName]?.reward) {
-                    // Use the specific reward for this NPC if available
-                    const rewardSprite = rewardData.sprite || rewardData.reward || tutorial.reward || "OneStar";
-                    
-                    progress.tutorial.checkpoints.set(npcName, {
-                        reward: rewardSprite,
-                        status: "Completed",
-                        date: updateTime,
-                        message: rewardData.message || "Tutorial Progress"
-                    });
-                    console.log(`Added/updated checkpoint for ${npcName} with reward ${rewardSprite}`);
-                }
-            });
-            
-            // If both Mark and Annie are in completed list, set tutorial status to "Completed"
-            let tutorialStatus = tutorial.status || progress.tutorial.status || "Not Started";
-            
-            if (allNpcsCompleted.includes('Mark') && allNpcsCompleted.includes('Annie')) {
-                tutorialStatus = "Completed";
-                console.log("Setting tutorial status to Completed based on NPCs talked to");
+                console.log("Updated tutorial checkpoints from request");
             }
             
             // Update tutorial data
-            progress.tutorial.status = tutorialStatus;
-            progress.tutorial.reward = tutorial.reward || progress.tutorial.reward || "";
-            progress.tutorial.date = tutorial.date ? new Date(tutorial.date) : updateTime;
+            if (tutorial.status)
+                progress.tutorial.status = tutorial.status;
+            if (tutorial.reward)
+                progress.tutorial.reward = tutorial.reward;
+            if (tutorial.date)
+                progress.tutorial.date = new Date(tutorial.date);
+            else
+                progress.tutorial.date = updateTime;
             
-            console.log(`Updated tutorial status to: ${tutorialStatus}`);
-            console.log("Tutorial checkpoints:", Object.fromEntries(progress.tutorial.checkpoints));
+            console.log(`Updated tutorial status to: ${progress.tutorial.status}`);
         }
 
-        // Process units data
+        // Process units data - IMPORTANT: Separate lesson NPCs from tutorial NPCs
         if (units) {
             // For each unit in the update
             Object.keys(units).forEach(unitKey => {
@@ -875,9 +842,9 @@ app.post('/api/game_progress', async (req, res) => {
                             };
                         }
                         
-                        // Handle NPCs talked to - this is the key part we need to fix
+                        // Handle NPCs talked to - IMPORTANT CHANGE
                         if (updatedLesson.npcsTalkedTo && Array.isArray(updatedLesson.npcsTalkedTo)) {
-                            // Get existing NPCs from the database
+                            // Get existing NPCs from the database for THIS SPECIFIC LESSON (not mixing with tutorial)
                             let existingNPCs = progress.units[unitKey].lessons[lessonKey].npcsTalkedTo || [];
                             
                             // Create a Set to eliminate duplicates
@@ -893,6 +860,22 @@ app.post('/api/game_progress', async (req, res) => {
                             
                             console.log(`Updated NPCs talked to for ${unitKey} ${lessonKey}: `, 
                                 progress.units[unitKey].lessons[lessonKey].npcsTalkedTo);
+                        }
+                        
+                        // Handle individual NPC rewards in lessons
+                        if (updatedLesson.rewards && typeof updatedLesson.rewards === 'object') {
+                            // Initialize rewards object if it doesn't exist
+                            if (!progress.units[unitKey].lessons[lessonKey].rewards) {
+                                progress.units[unitKey].lessons[lessonKey].rewards = {};
+                            }
+                            
+                            // Copy each NPC reward
+                            Object.keys(updatedLesson.rewards).forEach(npcName => {
+                                progress.units[unitKey].lessons[lessonKey].rewards[npcName] = 
+                                    updatedLesson.rewards[npcName];
+                            });
+                            
+                            console.log(`Updated rewards for ${unitKey} ${lessonKey}`);
                         }
                         
                         // Update other lesson fields if provided
@@ -916,6 +899,14 @@ app.post('/api/game_progress', async (req, res) => {
                     progress.units[unitKey].unitScore = updatedUnit.unitScore;
             });
         }
+        
+        // Update current unit/lesson if provided
+        if (currentUnit) {
+            progress.currentUnit = currentUnit;
+        }
+        if (currentLesson) {
+            progress.currentLesson = currentLesson;
+        }
 
         // Save the updated document
         await progress.save();
@@ -934,7 +925,8 @@ app.post('/api/game_progress', async (req, res) => {
                 date: progress.tutorial.date,
                 checkpoints: checkpointObjects
             },
-            npcsTalkedTo: progress.units.Unit1.lessons.Lesson1.npcsTalkedTo
+            currentUnit: progress.currentUnit,
+            currentLesson: progress.currentLesson
         });
     } catch (error) {
         console.error('Error saving progress:', error);
@@ -956,10 +948,159 @@ app.get('/api/game_progress/:username', async (req, res) => {
             });
         }
 
-        res.json(progress);
+        // Convert checkpoints map to object for JSON response
+        const responseData = progress.toObject();
+        
+        // Handle checkpoints conversion if they exist
+        if (progress.tutorial && progress.tutorial.checkpoints) {
+            const checkpointObjects = {};
+            progress.tutorial.checkpoints.forEach((value, key) => {
+                checkpointObjects[key] = value;
+            });
+            responseData.tutorial.checkpoints = checkpointObjects;
+        }
+
+        res.json(responseData);
     } catch (error) {
         console.error('Error fetching game progress:', error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ 
+            message: 'Server error',
+            error: error.message 
+        });
+    }
+});
+
+// UPDATE DELETE ENDPOINT: Reset tutorial progress
+app.delete('/api/game_progress/:username/tutorial', async (req, res) => {
+    try {
+        const { username } = req.params;
+        console.log(`Resetting tutorial progress for user: ${username}`);
+        
+        // Find the user's progress document
+        const progress = await GameProgress.findOne({ Username: username });
+        
+        if (!progress) {
+            console.log(`No progress found for user: ${username}, creating new profile`);
+            // Create a new progress document with default "Not Started" state
+            const newProgress = new GameProgress({ 
+                Username: username,
+                tutorial: {
+                    status: "Not Started",
+                    reward: "",
+                    date: new Date(),
+                    checkpoints: new Map()
+                },
+                units: {
+                    Unit1: {
+                        lessons: {
+                            Lesson1: {
+                                npcsTalkedTo: []
+                            }
+                        }
+                    }
+                }
+            });
+            
+            await newProgress.save();
+            
+            return res.json({ 
+                success: true, 
+                message: 'New profile created with reset tutorial progress',
+                username: username
+            });
+        }
+        
+        // Reset tutorial status
+        console.log(`Found progress for ${username}, resetting tutorial data`);
+        
+        // Initialize checkpoints map if it doesn't exist
+        if (!progress.tutorial.checkpoints) {
+            progress.tutorial.checkpoints = new Map();
+        } else {
+            // Clear existing checkpoints
+            progress.tutorial.checkpoints.clear();
+        }
+        
+        progress.tutorial.status = "Not Started";
+        progress.tutorial.reward = "";
+        progress.tutorial.date = new Date();
+        
+        // Clear NPCs talked to in Unit1/Lesson1
+        if (progress.units && 
+            progress.units.Unit1 && 
+            progress.units.Unit1.lessons && 
+            progress.units.Unit1.lessons.Lesson1) {
+            
+            // Clear the NPC list
+            if (!Array.isArray(progress.units.Unit1.lessons.Lesson1.npcsTalkedTo)) {
+                progress.units.Unit1.lessons.Lesson1.npcsTalkedTo = [];
+            } else {
+                progress.units.Unit1.lessons.Lesson1.npcsTalkedTo.length = 0;
+            }
+        }
+        
+        // Save the updated document - use markModified to ensure the changes are recognized
+        progress.markModified('tutorial.checkpoints'); 
+        progress.markModified('units.Unit1.lessons.Lesson1.npcsTalkedTo'); 
+        
+        await progress.save();
+        
+        console.log(`Tutorial progress successfully reset for ${username}`);
+        res.json({ 
+            success: true, 
+            message: 'Tutorial progress reset successfully',
+            username: username
+        });
+    } catch (error) {
+        console.error('Error resetting tutorial progress:', error);
+        res.status(500).json({ 
+            error: 'Server error', 
+            message: error.message 
+        });
+    }
+});
+
+// NEW ENDPOINT: Get completed NPCs from tutorial
+app.get('/api/game_progress/:username/completed_npcs', async (req, res) => {
+    try {
+        const { username } = req.params;
+        console.log(`Fetching completed NPCs for user: ${username}`);
+        
+        const progress = await GameProgress.findOne({ Username: username });
+        
+        if (!progress || !progress.tutorial || !progress.tutorial.checkpoints) {
+            console.log(`No completed NPCs found for ${username}`);
+            return res.json({
+                completedNPCs: [],
+                count: 0
+            });
+        }
+
+        // Convert Map to array of NPCs
+        const completedNPCs = [];
+        progress.tutorial.checkpoints.forEach((value, key) => {
+            if (value.status === "Completed") {
+                completedNPCs.push({
+                    name: key,
+                    reward: value.reward || "OneStar",
+                    date: value.date,
+                    message: value.message
+                });
+            }
+        });
+
+        console.log(`Found ${completedNPCs.length} completed NPCs for ${username}`);
+        res.json({
+            completedNPCs: completedNPCs,
+            count: completedNPCs.length
+        });
+    } catch (error) {
+        console.error(`Error fetching completed NPCs: ${error.message}`);
+        res.status(500).json({ 
+            error: `Error fetching completed NPCs: ${error.message}`,
+            completedNPCs: [],
+            count: 0
+        });
     }
 });
 
@@ -1136,5 +1277,7 @@ app.use((err, req, res, next) => {
 
 // Start the server
 app.listen(PORT, () => {
-    console.log(`Server running on http://192.168.1.11:${PORT}`);
+    console.log(`Server running on http://192.168.1.13:${PORT}`);
+  //  console.log(`Server running on http://192.168.141.149:${PORT}`);
+
 });
