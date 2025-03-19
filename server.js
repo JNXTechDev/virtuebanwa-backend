@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -805,17 +805,32 @@ app.post('/api/game_progress', async (req, res) => {
                 progress.tutorial.date = new Date(tutorial.date);
             else
                 progress.tutorial.date = updateTime;
+                
+            // AUTO-COMPLETE LOGIC: Check if all required NPCs are completed
+            // If we have all four NPCs completed, set tutorial status to Completed
+            const requiredNPCs = ['Janica', 'Mark', 'Annie', 'Rojan'];
+            let allNPCsCompleted = true;
             
-            console.log(`Updated tutorial status to: ${progress.tutorial.status}`);
+            for (const npc of requiredNPCs) {
+                const npcStatus = progress.tutorial.checkpoints.get(npc);
+                if (!npcStatus || npcStatus.status !== 'Completed') {
+                    allNPCsCompleted = false;
+                    break;
+                }
+            }
+            
+            if (allNPCsCompleted) {
+                console.log("All required NPCs completed - marking tutorial as Completed");
+                progress.tutorial.status = "Completed";
+            }
         }
-
-        // Process units data - IMPORTANT: Separate lesson NPCs from tutorial NPCs
+        
+        // Process units data
         if (units) {
-            // For each unit in the update
             Object.keys(units).forEach(unitKey => {
                 const updatedUnit = units[unitKey];
                 
-                // If this unit doesn't exist in the DB document, initialize it
+                // Ensure the unit exists in the database document
                 if (!progress.units[unitKey]) {
                     progress.units[unitKey] = {
                         status: updatedUnit.status || "Not Started",
@@ -1265,6 +1280,132 @@ app.post('/api/teacher/status', async (req, res) => {
     }
 });
 
+// Add new dialogue state schema after other schemas
+const dialogueStateSchema = new mongoose.Schema({
+    Username: { type: String, required: true },
+    DialogueId: { type: String, required: true },
+    Completed: { type: Boolean, default: true },
+    CompletionDate: { type: Date, default: Date.now }
+});
+
+// Create a compound index to ensure uniqueness per user/dialogue combination
+dialogueStateSchema.index({ Username: 1, DialogueId: 1 }, { unique: true });
+
+const DialogueState = mongoose.model('DialogueState', dialogueStateSchema);
+
+// API endpoint to save dialogue state
+app.post('/api/dialogue_state', async (req, res) => {
+    try {
+        const { Username, DialogueId, Completed } = req.body;
+        
+        if (!Username || !DialogueId) {
+            return res.status(400).send({ error: 'Username and DialogueId are required.' });
+        }
+        
+        console.log(`[DialogueState] Saving state for ${Username}: ${DialogueId} = ${Completed}`);
+        
+        // Use findOneAndUpdate with upsert to handle both creation and update
+        const result = await DialogueState.findOneAndUpdate(
+            { Username, DialogueId },
+            { Username, DialogueId, Completed, CompletionDate: new Date() },
+            { upsert: true, new: true }
+        );
+        
+        res.send({ 
+            message: 'Dialogue state saved successfully',
+            dialogueId: result.DialogueId,
+            completed: result.Completed
+        });
+    } catch (err) {
+        console.error(`Error saving dialogue state: ${err.message}`);
+        res.status(500).send({ error: err.message });
+    }
+});
+
+// API endpoint to check a specific dialogue state
+app.get('/api/dialogue_state/:username/:dialogueId', async (req, res) => {
+    try {
+        const { username, dialogueId } = req.params;
+        
+        const state = await DialogueState.findOne({ 
+            Username: username, 
+            DialogueId: dialogueId 
+        });
+        
+        if (!state) {
+            return res.send({ completed: false });
+        }
+        
+        res.send({ 
+            dialogueId: state.DialogueId,
+            completed: state.Completed,
+            completionDate: state.CompletionDate
+        });
+    } catch (err) {
+        console.error(`Error retrieving dialogue state: ${err.message}`);
+        res.status(500).send({ error: err.message });
+    }
+});
+
+// API endpoint to get all dialogue states for a user
+app.get('/api/dialogue_state/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        
+        const states = await DialogueState.find({ Username: username });
+        
+        const stateList = states.map(state => ({
+            dialogueId: state.DialogueId,
+            completed: state.Completed,
+            completionDate: state.CompletionDate
+        }));
+        
+        res.send(stateList);
+    } catch (err) {
+        console.error(`Error retrieving dialogue states: ${err.message}`);
+        res.status(500).send({ error: err.message });
+    }
+});
+
+// API endpoint to reset/delete a dialogue state
+app.delete('/api/dialogue_state/:username/:dialogueId', async (req, res) => {
+    try {
+        const { username, dialogueId } = req.params;
+        
+        const result = await DialogueState.findOneAndDelete({ 
+            Username: username, 
+            DialogueId: dialogueId 
+        });
+        
+        if (!result) {
+            return res.status(404).send({ message: 'Dialogue state not found' });
+        }
+        
+        res.send({ message: 'Dialogue state reset successfully' });
+    } catch (err) {
+        console.error(`Error resetting dialogue state: ${err.message}`);
+        res.status(500).send({ error: err.message });
+    }
+});
+
+// API endpoint to reset all dialogue states for a user
+app.delete('/api/dialogue_state/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        
+        const result = await DialogueState.deleteMany({ Username: username });
+        
+        if (result.deletedCount === 0) {
+            return res.status(404).send({ message: 'No dialogue states found for this user' });
+        }
+        
+        res.send({ message: `Deleted ${result.deletedCount} dialogue states for ${username}` });
+    } catch (err) {
+        console.error(`Error deleting dialogue states: ${err.message}`);
+        res.status(500).send({ error: err.message });
+    }
+});
+
 // Add error handling middleware
 app.use((err, req, res, next) => {
     console.error('Server error:', err);
@@ -1277,7 +1418,7 @@ app.use((err, req, res, next) => {
 
 // Start the server
 app.listen(PORT, () => {
-    console.log(`Server running on http://192.168.1.13:${PORT}`);
-  //  console.log(`Server running on http://192.168.141.149:${PORT}`);
+    console.log(`Server running on http://192.168.1.8:${PORT}`);
+    // console.log(`Server running on http://192.168.1.30:${PORT}`);
 
 });
