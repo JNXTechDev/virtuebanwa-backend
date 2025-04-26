@@ -327,47 +327,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Classroom schema & routes
-const classroomSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    code: { type: String, required: true, unique: true },
-    teacherUsername: { type: String, required: true }
-});
-
-const Classroom = mongoose.model('Classroom', classroomSchema);
-
-// POST create a new classroom
-app.post('/api/classrooms', async (req, res) => {
-    const { name, code, teacherUsername } = req.body;
-
-    if (!name || !code || !teacherUsername) {
-        return res.status(400).send({ error: 'Name, code, and teacherUsername are required.' });
-    }
-
-    try {
-        const newClassroom = new Classroom({ name, code, teacherUsername });
-        await newClassroom.save();
-        res.status(201).send({ message: 'Classroom created successfully', classroom: newClassroom });
-    } catch (err) {
-        res.status(500).send({ error: err.message });
-    }
-});
-
-// GET classrooms by teacher username
-app.get('/api/classrooms', async (req, res) => {
-    const { teacherUsername } = req.query;
-
-    if (!teacherUsername) {
-        return res.status(400).send({ error: 'teacherUsername is required.' });
-    }
-
-    try {
-        const classrooms = await Classroom.find({ teacherUsername });
-        res.send({ classrooms });
-    } catch (err) {
-        res.status(500).send({ error: err.message });
-    }
-});
 
 // DELETE user by full name
 app.delete('/api/users/remove', async (req, res) => {
